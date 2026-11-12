@@ -1,0 +1,19 @@
+:root{--bg:#fff5f8;--fg:#493b4a;--card:#fffdfd;--line:#f0cbd9;--acc:#c76b95;--bad:#c45d70;--ok:#648f78;--sky:#e5f3ff;--wood:#c49a78;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#241e27;--fg:#f7eaf1;--card:#302632;--line:#594451;--acc:#d894b4;--bad:#f08b9a;--ok:#9bc8a7;--sky:#29384a;--wood:#c49a78}}
+:root[data-theme="dark"]{--bg:#241e27;--fg:#f7eaf1;--card:#302632;--line:#594451;--acc:#d894b4;--bad:#f08b9a;--ok:#9bc8a7;--sky:#29384a;--wood:#c49a78}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.4 system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;padding:8px}
+#wrap{position:relative;width:min(960px,100%)}
+#hud{display:flex;justify-content:space-between;padding:4px 2px;font-weight:600}
+canvas{width:100%;height:auto;display:block;image-rendering:pixelated;border:2px solid var(--line);border-radius:14px;touch-action:manipulation}
+#panel{position:absolute;left:6%;right:6%;top:40px;bottom:12px;background:var(--card);border:2px solid var(--line);border-radius:14px;padding:12px;overflow:auto;display:none}
+button{background:var(--acc);color:#fff;border:0;border-radius:999px;padding:8px 16px;font-size:15px;margin:3px 3px 3px 0;cursor:pointer}
+.op{display:block;width:100%;text-align:left;background:var(--bg);color:var(--fg);border:1px solid var(--line)}
+input{font-size:16px;padding:7px;width:60%;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--fg)}
+.barra{height:8px;background:var(--line);border-radius:4px;overflow:hidden}
+.barra i{display:block;height:100%;background:var(--acc);width:100%}
+.ok{color:var(--ok);font-weight:600}.mal{color:var(--bad);font-weight:600}
+.pix{image-rendering:pixelated;width:48px;height:48px;vertical-align:middle}
+details{width:min(960px,100%);margin-top:12px}
+#out{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px;margin-top:6px;font-size:14px;overflow-x:auto}

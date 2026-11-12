@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="es">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+        <title>Hadas vs Monstruos: Nivel 1</title>
+        <link rel="stylesheet" href="diseño.css">
+        <script src="back.js" defer></script>
+    </head>
+    <body>
+        <div id="wrap">
+            <div id="hud"><span id="h1"></span><span id="h2"></span></div>
+            <canvas id="c" width="480" height="270"></canvas>
+            <div id="panel"></div>
+        </div>
+        <details open>
+            <summary>Probador de problemas</summary>
+            <button data-t="revivir">Generar problema de revivir</button>
+            <button data-t="jefe">Generar problema del jefe</button>
+            <button id="lote">Probar 200 de cada tipo</button>
+            <div id="out">Genera un problema para ver sus datos, operaciones, tiempo, respuesta y pasos.</div>
+        </details>
+
+        <details><summary>Arte pixel art (cargar PNG)</summary><div id="arte"></div></details>
+    </body>
+</html>

@@ -1,9 +1,9 @@
-:root{--bg:#fff5f8;--fg:#493b4a;--card:#fffdfd;--line:#f0cbd9;--acc:#c76b95;--bad:#c45d70;--ok:#648f78;--sky:#e5f3ff;--wood:#c49a78;
+:root{color-scheme:light;--bg:#fff0f6;--fg:#493b4a;--card:#fffafd;--line:#f0cbd9;--acc:#c76b95;--bad:#c45d70;--ok:#648f78;--sky:#e5f3ff;--wood:#c49a78;
 box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#241e27;--fg:#f7eaf1;--card:#302632;--line:#594451;--acc:#d894b4;--bad:#f08b9a;--ok:#9bc8a7;--sky:#29384a;--wood:#c49a78}}
-:root[data-theme="dark"]{--bg:#241e27;--fg:#f7eaf1;--card:#302632;--line:#594451;--acc:#d894b4;--bad:#f08b9a;--ok:#9bc8a7;--sky:#29384a;--wood:#c49a78}
-body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.4 system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;padding:8px}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#fff0f6;--fg:#493b4a;--card:#fffafd;--line:#f0cbd9;--acc:#c76b95;--bad:#c45d70;--ok:#648f78;--sky:#e5f3ff;--wood:#c49a78}}
+:root[data-theme="dark"]{--bg:#fff0f6;--fg:#493b4a;--card:#fffafd;--line:#f0cbd9;--acc:#c76b95;--bad:#c45d70;--ok:#648f78;--sky:#e5f3ff;--wood:#c49a78}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.4 "Palatino Linotype","Book Antiqua","URW Palladio L","Georgia","Times New Roman",serif;display:flex;flex-direction:column;align-items:center;padding:8px}
 #wrap{position:relative;width:min(960px,100%)}
 #hud{display:flex;justify-content:space-between;padding:4px 2px;font-weight:600}
 canvas{width:100%;height:auto;display:block;image-rendering:pixelated;border:2px solid var(--line);border-radius:14px;touch-action:manipulation}

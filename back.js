@@ -83,6 +83,48 @@ const W=480,H=270,GRAV=600,FLAP=-190,SPEED=110,GAP=84,PW=32,FX=90,RAD=8,LAMBDA=0
 const cv=document.getElementById("c"),g=cv.getContext("2d"),panelEl=document.getElementById("panel");
 const G={};let tm=null;
 const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const AudioContexto=window.AudioContext||window.webkitAudioContext;
+const botonSonido=document.getElementById("audioToggle");
+const sonidos={
+  inicio:[{f:390,d:.07},{f:520,d:.07,t:.07},{f:660,d:.12,t:.14}],
+  aleteo:[{f:520,d:.06,e:740}],
+  golpe:[{f:190,d:.15,e:65,w:"sawtooth"}],
+  correcto:[{f:660,d:.08},{f:880,d:.12,t:.08}],
+  incorrecto:[{f:280,d:.12,e:190},{f:180,d:.16,e:120,t:.12}],
+  derrota:[{f:392,d:.14,e:270},{f:260,d:.2,e:140,t:.14}],
+  victoria:[{f:523,d:.1},{f:659,d:.1,t:.1},{f:784,d:.18,t:.2}]
+};
+let audioContext=null,sonidoActivado=true;
+function emitirSonido(tipo){
+  if(!AudioContexto||!sonidoActivado)return;
+  if(!audioContext){
+    try{audioContext=new AudioContexto()}
+    catch(error){console.error("No se pudo inicializar el audio:",error);return}
+  }
+  if(audioContext.state==="suspended")audioContext.resume().catch(error=>console.error("No se pudo activar el audio:",error));
+  const ahora=audioContext.currentTime;
+  sonidos[tipo].forEach(n=>{
+    const inicio=ahora+(n.t||0),duracion=n.d;
+    const oscilador=audioContext.createOscillator(),volumen=audioContext.createGain();
+    oscilador.type=n.w||"square";
+    oscilador.frequency.setValueAtTime(n.f,inicio);
+    if(n.e)oscilador.frequency.exponentialRampToValueAtTime(n.e,inicio+duracion);
+    volumen.gain.setValueAtTime(.0001,inicio);
+    volumen.gain.exponentialRampToValueAtTime(.045,inicio+.01);
+    volumen.gain.exponentialRampToValueAtTime(.0001,inicio+duracion);
+    oscilador.connect(volumen);volumen.connect(audioContext.destination);
+    oscilador.start(inicio);oscilador.stop(inicio+duracion+.01);
+  });
+}
+if(AudioContexto){
+  botonSonido.onclick=()=>{
+    sonidoActivado=!sonidoActivado;
+    botonSonido.textContent=sonidoActivado?"🔊":"🔇";
+    botonSonido.setAttribute("aria-label",sonidoActivado?"Silenciar sonido":"Activar sonido");
+    botonSonido.setAttribute("aria-pressed",String(!sonidoActivado));
+    if(sonidoActivado)emitirSonido("inicio");
+  };
+}else botonSonido.hidden=true;
 
 /* ===== Pixel art: resolución lógica 480×270, se escala sin suavizado ===== */
 const ASSETS={rama:"img/rama.png"};
@@ -133,7 +175,7 @@ function timer(seg,onTick,onEnd){
 function retomar(){G.spawned=0;G.pipes=[];G.next=1;G.cd=3;G.y=H/2;G.vy=0;G.estado="cuenta";ocultar();hud()}
 
 function inicioViejo(){
-  panel(`<h3>🧚 Hadas vs Monstruos: Nivel 1</h3>
+  panel(`<h3>Hadas vs Monstruos: Nivel 1</h3>
   <p>Toca la pantalla o presiona espacio para aletear y esquiva las ramas. Cada 10 ramas aparece un monstruo: los dos primeros te hacen una pregunta (20 s) y el tercero es el jefe, con un problema.</p>
   <p>Chocar con una rama quita un corazón. Si fallas una pregunta, pierdes un corazón y debes resolver un problema para revivir. Si fallas ese problema, se muestra la solución y termina la partida.</p>
   <button id="jugar">Jugar</button>`);
@@ -159,7 +201,7 @@ function guardarRecord(){
 }
 function inicio(){
   const r=leerRecord();
-  panel(`<h3>🧚 Hadas vs Monstruos: Nivel 1</h3><p>Récord: <b>${r.puntos}</b> (<span id="rn"></span>)</p>
+  panel(`<h3>Hadas vs Monstruos: Nivel 1</h3><p>Récord: <b>${r.puntos}</b> (<span id="rn"></span>)</p>
   <p><input id="nom" maxlength="12" placeholder="Tu nombre"></p><p>Elige a tu hada:</p><div id="hs"></div>
   <p><button id="jugar">Jugar</button></p>
   <small>Espacio o toque = aletear. Cada 10 ramas aparece un monstruo: dos con pregunta (20 s) y el jefe con un problema. Chocar quita un corazón; si fallas una pregunta, resuelve un problema para revivir.</small>`);
@@ -175,7 +217,7 @@ function inicio(){
     hs.appendChild(d);
   });
   const jg=document.getElementById("jugar");
-  jg.onclick=()=>{NOMBRE=nom.value.trim()||"Jugador";nuevo();retomar()};
+  jg.onclick=()=>{emitirSonido("inicio");NOMBRE=nom.value.trim()||"Jugador";nuevo();retomar()};
   nom.onkeydown=e=>{if(e.key==="Enter")jg.click()};
 }
 function cerrar(titulo,msg,gano){
@@ -190,11 +232,12 @@ function cerrar(titulo,msg,gano){
   document.getElementById("cj").onclick=()=>{nuevo();inicio()};
   hud();
 }
-function fin(msg){cerrar("Fin de la partida",msg,false)}
-function nivelCompleto(){cerrar("🎉 ¡Nivel 1 completado!",`Corazones restantes: ${G.hearts} (10 puntos cada uno).`,true)}
+function fin(msg){emitirSonido("derrota");cerrar("Fin de la partida",msg,false)}
+function nivelCompleto(){emitirSonido("victoria");cerrar("🎉 ¡Nivel 1 completado!",`Corazones restantes: ${G.hearts} (10 puntos cada uno).`,true)}
 
 function golpe(piso){
   if(G.inv>0)return;
+  emitirSonido("golpe");
   G.hearts--;hud();
   if(piso){G.y=H/2;G.vy=0}
   if(G.hearts<=0)return fin("Te quedaste sin corazones.");
@@ -215,6 +258,7 @@ function pregunta(){
   const resolver=ok=>{
     if(listo)return;listo=true;clearInterval(tm);
     const fb=document.getElementById("fb");
+    emitirSonido(ok?"correcto":"incorrecto");
     if(ok){G.puntos+=5;hud();fb.innerHTML='<span class="ok">¡Correcto! Monstruo derrotado.</span>';setTimeout(()=>{G.seg++;retomar()},1000)}
     else{fb.innerHTML='<span class="mal">Fallaste. Pierdes un corazón.</span>';setTimeout(()=>{G.hearts--;hud();G.hearts<=0?fin("Fallaste la pregunta y no quedan corazones."):revivir()},1200)}
   };
@@ -233,6 +277,7 @@ function problema(tipo,ok,fail){
   const fin_=bien=>{
     if(listo)return;listo=true;clearInterval(tm);
     const fb=document.getElementById("fb");
+    emitirSonido(bien?"correcto":"incorrecto");
     if(bien){fb.innerHTML='<span class="ok">¡Correcto!</span>';setTimeout(ok,900)}
     else{fb.innerHTML='<span class="mal">Incorrecto o se acabó el tiempo.</span>';setTimeout(()=>fail(p),900)}
   };
@@ -258,7 +303,7 @@ function nivelCompletoViejo(){
   document.getElementById("rei").onclick=()=>{nuevo();retomar()};
 }
 
-function aletear(){if(G.estado==="vuelo")G.vy=FLAP}
+function aletear(){if(G.estado==="vuelo"){G.vy=FLAP;emitirSonido("aleteo")}}
 cv.addEventListener("pointerdown",aletear);
 addEventListener("keydown",e=>{if(e.code==="Space"&&document.activeElement.tagName!=="INPUT"){e.preventDefault();aletear()}});
 

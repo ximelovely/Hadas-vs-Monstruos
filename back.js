@@ -215,7 +215,7 @@ if(AudioContexto){
 }else botonSonido.hidden=true;
 
 /* ===== Pixel art: resolución lógica 480×270, se escala sin suavizado ===== */
-const ASSETS={rama:"img/rama.png"};
+const ASSETS={rama:"img/rama.png",monstruo1:"img/monstruo1.png",monstruo2:"img/monstruo2.png",jefe:"img/jefe.png"};
 const IMG={};let RAMA_PAT=null;
 function cargar(k,src){const i=new Image();i.onload=()=>{
   IMG[k]=i;
@@ -244,14 +244,20 @@ function rama(x,y,w,h,arriba){
 }
 
 function nuevo(){
-  Object.assign(G,{estado:"inicio",nivel:1,puntos:0,y:H/2,vy:0,hearts:3,seg:0,spawned:0,pipes:[],corazones:[],next:1,cd:0,inv:0,preg:rng.shuffle(NIVELES[0].preg)});
+  Object.assign(G,{estado:"inicio",nivel:1,puntos:0,y:H/2,vy:0,hearts:3,seg:0,spawned:0,pipes:[],corazones:[],enfrentamiento:null,next:1,cd:0,inv:0,preg:rng.shuffle(NIVELES[0].preg)});
   hud();
 }
 function hud(){
   document.getElementById("h1").textContent=(NOMBRE?NOMBRE+" · ":"")+"Nivel "+G.nivel+" · "+"❤".repeat(Math.max(G.hearts,0))+"🖤".repeat(3-Math.max(G.hearts,0));
   document.getElementById("h2").textContent=`Puntos ${G.puntos} · Récord ${leerRecord().puntos} · `+(G.seg<2?`Monstruo ${G.seg+1} de 3`:"Jefe final");
 }
-function panel(html){clearInterval(tm);panelEl.innerHTML=html;panelEl.style.display="block"}
+function panel(html,encuentro=false){
+  clearInterval(tm);
+  panelEl.classList.toggle("encuentro",encuentro);
+  panelEl.innerHTML=html;
+  panelEl.scrollTop=0;
+  panelEl.style.display="block";
+}
 function ocultar(){panelEl.style.display="none"}
 function timer(seg,onTick,onEnd){
   clearInterval(tm);const t0=performance.now();
@@ -260,7 +266,7 @@ function timer(seg,onTick,onEnd){
     if(left<=0){clearInterval(tm);onEnd()}
   },100);
 }
-function retomar(){G.spawned=0;G.pipes=[];G.corazones=[];G.next=1;G.cd=3;G.y=H/2;G.vy=0;G.estado="cuenta";ocultar();hud()}
+function retomar(){G.spawned=0;G.pipes=[];G.corazones=[];G.enfrentamiento=null;G.enemigoX=W;G.next=1;G.cd=3;G.y=H/2;G.vy=0;G.estado="cuenta";ocultar();hud()}
 
 /* ===== Jugador, hadas y récord ===== */
 const maxPts=()=>NIVELES.length*25+30; // por nivel: 2 preguntas × 5 + jefe 15; al final, 3 corazones × 10
@@ -331,17 +337,32 @@ function golpe(piso){
   if(G.hearts<=0)return fin("Te quedaste sin corazones.");
   G.inv=2;
 }
+function dibujarEnemigo(clave,x){
+  const imagen=IMG[clave];
+  if(!imagen)return;
+  const esJefe=clave==="jefe";
+  const altoMax=esJefe?260:235,anchoMax=esJefe?250:180;
+  const escala=Math.min(anchoMax/imagen.width,altoMax/imagen.height);
+  const ancho=imagen.width*escala,alto=imagen.height*escala;
+  g.drawImage(imagen,Math.round(x),Math.round(H-alto),Math.round(ancho),Math.round(alto));
+}
 function monstruo(){
+  G.estado="llegada";
+  G.enfrentamiento=G.seg<2?`monstruo${G.seg+1}`:"jefe";
+  G.enemigoX=W;G.pipes=[];G.corazones=[];G.y=H/2;G.vy=0;
+}
+function enfrentarMonstruo(){
   G.estado="pausa";
-  if(G.seg<2)pregunta();else problema("jefe",()=>{G.puntos+=15;nivelCompleto()},p=>{
+  if(G.seg<2)pregunta();else problema("jefe",()=>{G.puntos+=15;G.enfrentamiento=null;nivelCompleto()},p=>{
+    G.enfrentamiento=null;
     G.hearts--;hud();
     solucion(p,()=>G.hearts<=0?fin("Fallaste al jefe y no quedan corazones."):revivir());
   });
 }
 function pregunta(){
   const q=G.preg[G.seg],ops=rng.shuffle(q.o.map((t,i)=>({t,ok:i===0})));
-  panel(`<h3>${icono("monstruo","👹")} Monstruo ${G.seg+1}</h3><p>${q.q}</p><div class="barra"><i id="b"></i></div><p id="t">20 s</p>`+
-    ops.map((o,i)=>`<button class="op" data-i="${i}">${o.t}</button>`).join("")+`<p id="fb"></p>`);
+  panel(`<h3>${icono("monstruo"+(G.seg+1),"👹")} Monstruo ${G.seg+1}</h3><p>${q.q}</p><div class="barra"><i id="b"></i></div><p id="t">20 s</p>`+
+    ops.map((o,i)=>`<button class="op" data-i="${i}">${o.t}</button>`).join("")+`<p id="fb"></p>`,true);
   let listo=false;
   const resolver=ok=>{
     if(listo)return;listo=true;clearInterval(tm);
@@ -354,13 +375,14 @@ function pregunta(){
   timer(20,l=>{document.getElementById("b").style.width=(l/20*100)+"%";document.getElementById("t").textContent=Math.ceil(l)+" s"},()=>resolver(false));
 }
 function revivir(){
+  G.enfrentamiento=null;
   problema("revivir",()=>{G.inv=2;retomar()},p=>solucion(p,()=>fin("No resolviste el problema para revivir.")));
 }
 function problema(tipo,ok,fail){
   const p=generarProblema(tipo);
   panel(`<h3>${tipo==="jefe"?icono("jefe","👹")+" Jefe final":"💀 Problema para revivir"}</h3><p>${p.enunciado}</p>
   <div class="barra"><i id="b"></i></div><p id="t">${p.tiempo} s</p>
-  <input id="in" type="number" step="any" inputmode="decimal" placeholder="Tu respuesta"> <button id="rs">Responder</button><p id="fb"></p>`);
+  <input id="in" type="number" step="any" inputmode="decimal" placeholder="Tu respuesta"> <button id="rs">Responder</button><p id="fb"></p>`,tipo==="jefe");
   const inp=document.getElementById("in");let listo=false;
   const fin_=bien=>{
     if(listo)return;listo=true;clearInterval(tm);
@@ -371,7 +393,7 @@ function problema(tipo,ok,fail){
   };
   document.getElementById("rs").onclick=()=>{const v=parseFloat(inp.value);if(!isNaN(v))fin_(acierta(v,p))};
   inp.onkeydown=e=>{if(e.key==="Enter")document.getElementById("rs").click()};
-  inp.focus();
+  if(tipo==="jefe")inp.focus({preventScroll:true});else inp.focus();
   timer(p.tiempo,l=>{document.getElementById("b").style.width=(l/p.tiempo*100)+"%";document.getElementById("t").textContent=Math.ceil(l)+" s"},()=>fin_(false));
 }
 function solucion(p,sig){
@@ -413,11 +435,16 @@ function loop(ts){
     }
     if(G.estado==="vuelo"&&G.spawned===10&&G.pipes.every(p=>p.x+PW<FX-RAD))monstruo();
   }
+  if(G.estado==="llegada"){
+    G.enemigoX-=NV().vel*dt;
+    if(G.enemigoX<=FX+50){G.enemigoX=FX+50;enfrentarMonstruo()}
+  }
   dibujar();requestAnimationFrame(loop);
 }
 function dibujar(){
   g.imageSmoothingEnabled=false;
   if(IMG.fondo)g.drawImage(IMG.fondo,0,0,W,H);else{g.fillStyle=css("--sky");g.fillRect(0,0,W,H)}
+  if(G.enfrentamiento&&(G.estado==="llegada"||G.estado==="pausa"))dibujarEnemigo(G.enfrentamiento,G.enemigoX);
   G.pipes.forEach(p=>{const x=Math.round(p.x),a=Math.round(p.gy-GAP/2),b=Math.round(p.gy+GAP/2);rama(x,0,PW,a,true);rama(x,b,PW,H-b,false)});
   G.corazones.forEach(dibujarCorazon);
   g.globalAlpha=G.inv>0&&Math.floor(G.inv*8)%2?0.35:1;

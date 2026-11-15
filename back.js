@@ -69,6 +69,7 @@ function iterarMixto(r,{m,a,c,x0},n){
   return x;
 }
 const EXPL_MIXTO=n=>`En un generador congruencial mixto cada valor sale del anterior con Xₙ₊₁ = (a·Xₙ + c) mod m: se multiplica, se suma c y se toma el residuo al dividir entre m. Se repite ${n} ${n===1?"vez":"veces"} a partir de la semilla X₀.`;
+//no se si está bien pero al menos funciona, la tengo q checar una vez q tenga el fondo ya dibujado
 function tMixtoX(rng,n){
   const d=mixtoDatos(rng),r=new Resolutor(),x=iterarMixto(r,d,n);
   return{
@@ -171,6 +172,7 @@ const G={};let tm=null;
 const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const AudioContexto=window.AudioContext||window.webkitAudioContext;
 const botonSonido=document.getElementById("audioToggle");
+const wrapEl=document.getElementById("wrap"),botonPantalla=document.getElementById("fullscreenToggle");
 const sonidos={
   inicio:[{f:390,d:.07},{f:520,d:.07,t:.07},{f:660,d:.12,t:.14}],
   seleccion:[{f:520,d:.06},{f:780,d:.08,t:.05}],
@@ -213,9 +215,27 @@ if(AudioContexto){
     if(sonidoActivado)emitirSonido("inicio");
   };
 }else botonSonido.hidden=true;
+if(document.fullscreenEnabled&&wrapEl.requestFullscreen){
+  const actualizarBotonPantalla=()=>{
+    const activa=document.fullscreenElement===wrapEl;
+    botonPantalla.setAttribute("aria-label",activa?"Salir de pantalla completa":"Activar pantalla completa");
+    botonPantalla.setAttribute("aria-pressed",String(activa));
+    botonPantalla.title=activa?"Salir de pantalla completa":"Activar pantalla completa";
+  };
+  botonPantalla.onclick=async()=>{
+    try{
+      if(document.fullscreenElement===wrapEl)await document.exitFullscreen();
+      else await wrapEl.requestFullscreen();
+    }catch(error){
+      console.error("No se pudo cambiar el modo de pantalla completa:",error);
+      alert("No se pudo cambiar el modo de pantalla completa en este navegador.");
+    }
+  };
+  document.addEventListener("fullscreenchange",actualizarBotonPantalla);
+}else botonPantalla.hidden=true;
 
 /* ===== Pixel art: resolución lógica 480×270, se escala sin suavizado ===== */
-const ASSETS={rama:"img/rama.png",monstruo1:"img/monstruo1.png",monstruo2:"img/monstruo2.png",jefe:"img/jefe.png"};
+const ASSETS={fondo:"img/fondo.jpeg",rama:"img/rama.png",monstruo1:"img/monstruo1.png",monstruo2:"img/monstruo2.png",jefe:"img/jefe.png"};
 const IMG={};let RAMA_PAT=null;
 function cargar(k,src){const i=new Image();i.onload=()=>{
   IMG[k]=i;
@@ -269,7 +289,7 @@ function timer(seg,onTick,onEnd){
 function retomar(){G.spawned=0;G.pipes=[];G.corazones=[];G.enfrentamiento=null;G.enemigoX=W;G.next=1;G.cd=3;G.y=H/2;G.vy=0;G.estado="cuenta";ocultar();hud()}
 
 /* ===== Jugador, hadas y récord ===== */
-const maxPts=()=>NIVELES.length*25+30; // por nivel: 2 preguntas × 5 + jefe 15; al final, 3 corazones × 10
+const maxPts=()=>NIVELES.length*25+30; // por nivel: 2 preguntas × 5 + jefe 15; al final, 3 corazones × 10, me quiero matar
 let NOMBRE="",SEL=0,recMem={nombre:"—",puntos:0};
 const HADA_RUTAS=Array.from({length:6},(_,i)=>`img/hada${i+1}.png`);
 const HADAS=[];
@@ -352,6 +372,7 @@ function monstruo(){
   G.enemigoX=W;G.pipes=[];G.corazones=[];G.y=H/2;G.vy=0;
 }
 function enfrentarMonstruo(){
+  //esta chingadera esta toda bugegeada y no sirve para nada, pero la dejo por si acaso
   G.estado="pausa";
   if(G.seg<2)pregunta();else problema("jefe",()=>{G.puntos+=15;G.enfrentamiento=null;nivelCompleto()},p=>{
     G.enfrentamiento=null;
@@ -443,7 +464,10 @@ function loop(ts){
 }
 function dibujar(){
   g.imageSmoothingEnabled=false;
-  if(IMG.fondo)g.drawImage(IMG.fondo,0,0,W,H);else{g.fillStyle=css("--sky");g.fillRect(0,0,W,H)}
+  if(IMG.fondo){
+    g.drawImage(IMG.fondo,0,0,W,H);
+    g.fillStyle="rgba(255,255,255,.4)";g.fillRect(0,0,W,H);
+  }else{g.fillStyle=css("--sky");g.fillRect(0,0,W,H)}
   if(G.enfrentamiento&&(G.estado==="llegada"||G.estado==="pausa"))dibujarEnemigo(G.enfrentamiento,G.enemigoX);
   G.pipes.forEach(p=>{const x=Math.round(p.x),a=Math.round(p.gy-GAP/2),b=Math.round(p.gy+GAP/2);rama(x,0,PW,a,true);rama(x,b,PW,H-b,false)});
   G.corazones.forEach(dibujarCorazon);
@@ -457,27 +481,9 @@ const CORAZON_PIXEL=["01100110","11211121","11111111","11111111","01111110","001
 function dibujarCorazon(c){
   const escala=2,x0=Math.round(c.x-8),y0=Math.round(c.y-7);
   CORAZON_PIXEL.forEach((fila,y)=>[...fila].forEach((px,x)=>{
-    if(px!=="0"){g.fillStyle=px==="2"?"#ff5555":"#d90020";g.fillRect(x0+x*escala,y0+y*escala,escala,escala)}
+    if(px!=="0"){g.fillStyle=px==="2"?"#ff5555":"#d90020";g.fillRect(x0+x*escala,y0+y*escala,escala,escala)} //no supe como dibujar esta chingadera con fillRect, así que lo hice pixel por pixel, pero al menos se ve bonito
   }));
 }
-
-/* ============ Probador de problemas ============ */
-const out=document.getElementById("out");
-document.querySelectorAll("[data-t]").forEach(b=>b.onclick=()=>{
-  const nv=+document.getElementById("selNivel").value,p=generarProblema(b.dataset.t,nv);
-  out.innerHTML=`<p><b>${p.enunciado}</b></p>
-  <p>Tiempo asignado: <b>${p.tiempo} s</b> (rango ${NIVELES[nv-1].rango[b.dataset.t].t.join(" a ")} s) · Operaciones: ${Object.entries(p.ops).map(([k,v])=>k+" "+v).join(", ")}</p>
-  <p class="ok">Respuesta: ${p.respuestaTexto}</p><p>${p.explicacion}</p><ol>${p.pasos.map(s=>`<li>${s}</li>`).join("")}</ol>`;
-});
-document.getElementById("lote").onclick=()=>{
-  const nv=+document.getElementById("selNivel").value;let txt="";
-  for(const tipo of ["revivir","jefe"]){
-    let mn=1e9,mx=0,fuera=0;
-    for(let i=0;i<200;i++){const p=generarProblema(tipo,nv);mn=Math.min(mn,p.tiempo);mx=Math.max(mx,p.tiempo);if(p.fuera)fuera++}
-    txt+=`<p>${tipo}: tiempos de ${mn} a ${mx} s (rango ${NIVELES[nv-1].rango[tipo].t.join(" a ")} s), ${fuera} fuera de rango.</p>`;
-  }
-  out.innerHTML=txt;
-};
 
 cargarHadas.then(()=>{nuevo();inicio();requestAnimationFrame(loop)}).catch(error=>{
   console.error(error);

@@ -124,6 +124,8 @@ function generarProblema(tipo,nivel=G.nivel){
   const N=NIVELES[nivel-1],{n,t}=N.rango[tipo];let p;
   for(let k=0;k<30;k++){
     p=rng.pick(N.plant[tipo])(rng,rng.int(n[0],n[1]));
+    // modifiqué tiempos: nivel 3 usa tiempo fijo (tfijo) o, si no tiene, tmin + 10 s por campo
+    if(p.tmin){p.tiempo=p.tfijo||Math.max(p.tmin,calcularTiempo(p.ops,p.margen||1.2))+(p.campos?p.campos.length*10:0);p.fuera=false;return p}
     p.tiempo=calcularTiempo(p.ops);
     if(p.tiempo>=t[0]&&p.tiempo<=t[1]){p.fuera=false;return p}
   }
@@ -161,7 +163,10 @@ const NIVELES=[
    rango:{revivir:{n:[3,5],t:[60,90]},jefe:{n:[8,9],t:[120,150]}}},
   {tema:"generación de números rectangulares",vel:VELOCIDAD_TUBOS,lambda:LAMBDA_TUBOS,preg:PREG2,
    plant:{revivir:[tMixtoX,tMixtoR,tMulti],jefe:[tPeriodo]},
-   rango:{revivir:{n:[2,4],t:[60,105]},jefe:{n:[8,9],t:[180,240]}}} // en el jefe, n es el valor de m
+   rango:{revivir:{n:[2,4],t:[60,105]},jefe:{n:[8,9],t:[180,240]}}}, // en el jefe, n es el valor de m
+  {tema:"pruebas de promedios, frecuencias y KS",vel:VELOCIDAD_TUBOS,lambda:LAMBDA_TUBOS,preg:[],sinTeoria:true,
+   plant:{revivir:[tPromedios,tFrecuencias],jefe:[tKS,tFrecuencias],monstruo:[tMonMedia,tMonFO]},
+   rango:{revivir:{n:[4,6],t:[90,120]},jefe:{n:[7,10],t:[150,180]},monstruo:{n:[4,6],t:[40,70]}}} // modifiqué tiempos: aquí el tiempo real viene de nivel3.js
 ];
 
 /* ============ Juego ============ */
@@ -374,7 +379,7 @@ function monstruo(){
 function enfrentarMonstruo(){
   //esta chingadera esta toda bugegeada y no sirve para nada, pero la dejo por si acaso
   G.estado="pausa";
-  if(G.seg<2)pregunta();else problema("jefe",()=>{G.puntos+=15;G.enfrentamiento=null;nivelCompleto()},p=>{
+  if(G.seg<2){NV().sinTeoria?problemaMonstruo():pregunta()}else problema("jefe",()=>{G.puntos+=15;G.enfrentamiento=null;nivelCompleto()},p=>{
     G.enfrentamiento=null;
     G.hearts--;hud();
     solucion(p,()=>G.hearts<=0?fin("Fallaste al jefe y no quedan corazones."):revivir());
@@ -401,6 +406,7 @@ function revivir(){
 }
 function problema(tipo,ok,fail){
   const p=generarProblema(tipo);
+  if(p.campos)return problemaCampos(p,tipo,ok,fail);
   panel(`<h3>${tipo==="jefe"?icono("jefe","👹")+" Jefe final":"💀 Problema para revivir"}</h3><p>${p.enunciado}</p>
   <div class="barra"><i id="b"></i></div><p id="t">${p.tiempo} s</p>
   <input id="in" type="number" step="any" inputmode="decimal" placeholder="Tu respuesta"> <button id="rs">Responder</button><p id="fb"></p>`,tipo==="jefe");

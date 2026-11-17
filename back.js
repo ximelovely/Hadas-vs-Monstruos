@@ -532,12 +532,19 @@ function nuevo(){
   hud();
 }
 function hud(){
+  if(G.estado==="inicio"){
+    document.getElementById("h1").textContent="Modelado y Simulación";
+    document.getElementById("h2").textContent="Equipo 4 · FIME UANL";
+    return;
+  }
   document.getElementById("h1").textContent=(NOMBRE?NOMBRE+" · ":"")+"Nivel "+G.nivel+" · "+"❤".repeat(Math.max(G.hearts,0))+"🖤".repeat(3-Math.max(G.hearts,0));
   document.getElementById("h2").textContent=`Puntos ${G.puntos} · Récord ${leerRecord().puntos} · `+(G.seg<2?`Monstruo ${G.seg+1} de 3`:"Jefe final");
 }
 function panel(html,encuentro=false){
   clearInterval(tm);
   panelEl.classList.toggle("encuentro",encuentro);
+  panelEl.classList.remove("inicio");
+  panelEl.removeAttribute("style");
   panelEl.innerHTML=html;
   panelEl.scrollTop=0;
   panelEl.style.display="block";
@@ -572,24 +579,99 @@ function guardarRecord(){
 }
 function inicio(){
   const r=leerRecord();
-  panel(`<h3>Hadas vs Monstruos</h3><p>Récord: <b>${r.puntos}</b> (<span id="rn"></span>)</p>
-  <p><input id="nom" maxlength="12" placeholder="Tu nombre"></p><p>Elige a tu hada:</p><div id="hs"></div>
-  <p><button id="jugar">Jugar</button></p>
-  <small>Espacio o toque = aletear. Cada 10 ramas aparece un monstruo: dos con pregunta (20 s) y el jefe con un problema. Chocar quita un corazón; recoge los corazones que aparezcan para recuperarlos (máximo 3). Si fallas una pregunta, resuelve un problema para revivir.</small>`);
-  document.getElementById("rn").textContent=r.nombre;
+  panel(`<div class="portada">
+    <h1 class="titulo" aria-label="Hadas vs Monstruos">
+      <span class="t-hadas">Hadas</span>
+      <span class="t-vs"><i>✦</i> vs <i>✦</i></span>
+      <span class="t-monstruos">Monstruos</span>
+    </h1>
+    <div class="fila">
+      <label class="nombre-campo"><span>Tu nombre</span><input id="nom" maxlength="12" placeholder="Escríbelo aquí" autocomplete="off"></label>
+      <p class="record">🏆 <span id="rp"></span></p>
+    </div>
+    <div class="elige">Elige a tu hada</div>
+    <div id="hs" role="group" aria-label="Elige a tu hada"></div>
+    <button id="jugar" class="jugar" type="button">Jugar</button>
+    <p class="pista">Espacio o clic = aletear</p>
+    <details class="como"><summary>¿Cómo se juega?</summary>
+      <p>Cada 10 ramas aparece un monstruo: dos con pregunta (20 s) y el jefe con un problema. Chocar quita un corazón; recoge los corazones que aparezcan para recuperarlos (máximo 3). Si fallas una pregunta, resuelve un problema para revivir.</p>
+    </details>
+  </div>`);
+  panelEl.classList.add("inicio");
+  ajustarPortada();
+  document.getElementById("rp").textContent=r.puntos>0?`Récord ${r.puntos} · ${r.nombre}`:"Aún sin récord";
   const nom=document.getElementById("nom");nom.value=NOMBRE;nom.oninput=()=>{NOMBRE=nom.value};
   const hs=document.getElementById("hs");
+  const elegir=i=>{SEL=i;emitirSonido("seleccion");hs.querySelectorAll(".card").forEach((e,j)=>{e.classList.toggle("sel",j===i);e.setAttribute("aria-pressed",j===i)})};
   HADAS.forEach((h,i)=>{
-    const d=document.createElement("div"),imagen=document.createElement("img");
-    d.className="card"+(i===SEL?" sel":"");
-    imagen.className="fairy-option";imagen.src=HADA_RUTAS[i];imagen.alt=`Hada ${i+1}`;
+    const d=document.createElement("button"),imagen=document.createElement("img");
+    d.type="button";d.className="card"+(i===SEL?" sel":"");d.setAttribute("aria-pressed",i===SEL);d.setAttribute("aria-label",`Hada ${i+1}`);
+    imagen.className="fairy-option";imagen.src=HADA_RUTAS[i];imagen.alt="";
     d.appendChild(imagen);
-    d.onclick=()=>{SEL=i;emitirSonido("seleccion");hs.querySelectorAll(".card").forEach((e,j)=>e.classList.toggle("sel",j===i))};
+    d.onclick=()=>elegir(i);
     hs.appendChild(d);
   });
+  // flechas ← → para cambiar de hada con el teclado
+  hs.onkeydown=e=>{
+    if(e.key!=="ArrowLeft"&&e.key!=="ArrowRight")return;
+    e.preventDefault();
+    const i=(SEL+(e.key==="ArrowRight"?1:HADAS.length-1))%HADAS.length;
+    elegir(i);hs.children[i].focus();
+  };
   const jg=document.getElementById("jugar");
   jg.onclick=()=>{emitirSonido("inicio");NOMBRE=nom.value.trim()||"Jugador";nuevo();retomar()};
   nom.onkeydown=e=>{if(e.key==="Enter")jg.click()};
+  nom.focus({preventScroll:true});
+}
+
+// la portada cubre exactamente el canvas (los demás paneles dejan margen para el HUD)
+function ajustarPortada(){
+  if(!panelEl.classList.contains("inicio"))return;
+  Object.assign(panelEl.style,{
+    display:"block",top:cv.offsetTop+cv.clientTop+"px",left:cv.offsetLeft+cv.clientLeft+"px",
+    width:cv.clientWidth+"px",height:cv.clientHeight+"px",right:"auto",bottom:"auto"
+  });
+}
+addEventListener("resize",ajustarPortada);
+document.addEventListener("fullscreenchange",()=>setTimeout(ajustarPortada,60));
+
+/* ===== Escena de fondo de la portada (se dibuja en el canvas) ===== */
+const LUCES=Array.from({length:28},()=>({x:Math.random()*W,y:30+Math.random()*(H-60),v:4+Math.random()*9,f:Math.random()*6.28,c:Math.random()<.35?"#ff9bb0":"#ffe08a",s:Math.random()<.2?3:2}));
+const SOMBRAS={};
+function sombra(k,alto){ // versión oscurecida del sprite: los monstruos acechan entre las sombras
+  if(SOMBRAS[k])return SOMBRAS[k];
+  const i=IMG[k];if(!i)return null;
+  const esc=alto*2/i.height,c=document.createElement("canvas");
+  c.width=Math.round(i.width*esc);c.height=Math.round(i.height*esc);
+  const x=c.getContext("2d");x.drawImage(i,0,0,c.width,c.height);
+  x.globalCompositeOperation="source-atop";x.fillStyle="rgba(14,12,38,.5)";x.fillRect(0,0,c.width,c.height);
+  return SOMBRAS[k]=c;
+}
+function dibujarInicio(){
+  const t=performance.now()/1000;
+  if(IMG.fondo)g.drawImage(IMG.fondo,0,0,W,H);else{g.fillStyle=css("--sky");g.fillRect(0,0,W,H)}
+  g.fillStyle="rgba(14,17,40,.52)";g.fillRect(0,0,W,H);
+  // resplandor rosa detrás del título
+  let gr=g.createRadialGradient(W/2,70,5,W/2,70,190);
+  gr.addColorStop(0,"rgba(241,138,154,.24)");gr.addColorStop(1,"rgba(241,138,154,0)");
+  g.fillStyle=gr;g.fillRect(0,0,W,H);
+  // monstruos al acecho en las esquinas
+  [["monstruo1",150,-14,0],["jefe",175,null,1.2]].forEach(([k,alto,x0,fase])=>{
+    const s=sombra(k,alto);if(!s)return;
+    const w=s.width/2,x=x0===null?W-w+12:x0,y=Math.round(Math.sin(t*1.5+fase)*2);
+    g.drawImage(s,Math.round(x),Math.round(H-alto+y+6),Math.round(w),alto);
+  });
+  // viñeta
+  gr=g.createRadialGradient(W/2,H/2,H*.35,W/2,H/2,W*.62);
+  gr.addColorStop(0,"rgba(8,10,28,0)");gr.addColorStop(1,"rgba(8,10,28,.6)");
+  g.fillStyle=gr;g.fillRect(0,0,W,H);
+  // luciérnagas
+  LUCES.forEach(l=>{
+    const x=(l.x+Math.sin(t*.7+l.f)*14+t*l.v*.4)%W,y=l.y+Math.sin(t*1.1+l.f*1.7)*9;
+    g.globalAlpha=.3+.7*(.5+.5*Math.sin(t*2+l.f));
+    g.fillStyle=l.c;g.fillRect(Math.round(x),Math.round(y),l.s,l.s);
+  });
+  g.globalAlpha=1;
 }
 function cerrar(titulo,msg,gano){
   G.estado="fin";
@@ -728,9 +810,10 @@ function loop(ts){
 }
 function dibujar(){
   g.imageSmoothingEnabled=false;
+  if(G.estado==="inicio")return dibujarInicio();
   if(IMG.fondo){
     g.drawImage(IMG.fondo,0,0,W,H);
-    g.fillStyle="rgba(255,255,255,.4)";g.fillRect(0,0,W,H);
+    g.fillStyle="rgba(255,255,255,.2)";g.fillRect(0,0,W,H);
   }else{g.fillStyle=css("--sky");g.fillRect(0,0,W,H)}
   if(G.enfrentamiento&&(G.estado==="llegada"||G.estado==="pausa"))dibujarEnemigo(G.enfrentamiento,G.enemigoX);
   G.pipes.forEach(p=>{const x=Math.round(p.x),a=Math.round(p.gy-GAP/2),b=Math.round(p.gy+GAP/2);rama(x,0,PW,a,true);rama(x,b,PW,H-b,false)});
@@ -738,8 +821,8 @@ function dibujar(){
   g.globalAlpha=G.inv>0&&Math.floor(G.inv*8)%2?0.35:1;
   const h=HADAS[SEL];g.drawImage(h,Math.round(FX-16),Math.round(G.y-16),32,32);g.globalAlpha=1;
   g.textAlign="center";g.textBaseline="middle";g.fillStyle=css("--fg");
-  if(G.estado==="cuenta"){g.font="bold 32px monospace";g.fillText(Math.ceil(G.cd),W/2,H/2-50)}
-  g.font="10px monospace";g.textAlign="left";g.fillText(`Ramas del tramo: ${G.spawned}/10`,6,H-8);
+  if(G.estado==="cuenta"){g.font='bold 32px "VT323", monospace';g.fillText(Math.ceil(G.cd),W/2,H/2-50)}
+  g.font='16px "VT323", monospace';g.textAlign="left";g.fillText(`Ramas del tramo: ${G.spawned}/10`,6,H-8);
 }
 const CORAZON_PIXEL=["01100110","11211121","11111111","11111111","01111110","00111100","00011000"];
 function dibujarCorazon(c){

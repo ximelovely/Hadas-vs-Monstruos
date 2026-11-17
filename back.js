@@ -427,6 +427,7 @@ const NIVELES=[
    plant:{revivir:[tPromedios,tFrecuencias],jefe:[tKS,tFrecuencias],monstruo:[tMonMedia,tMonFO]},
    rango:{revivir:{n:[4,6],t:[150,240]},jefe:{n:[7,10],t:[235,335]},monstruo:{n:[4,6],t:[40,100]}}} // tiempo = operaciones × margen + 10 s por campo extra
 ];
+const MODO_DESARROLLADOR=new URLSearchParams(location.search).get("dev")==="1";
 
 /* ============ Juego ============ */
 const W=480,H=270,GRAV=600,FLAP=-190,GAP=84,PW=32,FX=90,RAD=8;
@@ -591,6 +592,7 @@ function inicio(){
     </div>
     <div class="elige">Elige a tu hada</div>
     <div id="hs" role="group" aria-label="Elige a tu hada"></div>
+    ${MODO_DESARROLLADOR?`<div class="dev-tools"><label for="nivelPrueba">Nivel de prueba</label><select id="nivelPrueba">${NIVELES.map((nivel,i)=>`<option value="${i+1}">Nivel ${i+1}</option>`).join("")}</select></div>`:""}
     <button id="jugar" class="jugar" type="button">Jugar</button>
     <p class="pista">Espacio o clic = aletear</p>
     <details class="como"><summary>¿Cómo se juega?</summary>
@@ -619,7 +621,11 @@ function inicio(){
     elegir(i);hs.children[i].focus();
   };
   const jg=document.getElementById("jugar");
-  jg.onclick=()=>{emitirSonido("inicio");NOMBRE=nom.value.trim()||"Jugador";nuevo();retomar()};
+  jg.onclick=()=>{
+    emitirSonido("inicio");NOMBRE=nom.value.trim()||"Jugador";nuevo();
+    if(MODO_DESARROLLADOR){G.nivel=Number(document.getElementById("nivelPrueba").value);G.preg=rng.shuffle(NV().preg)}
+    retomar();
+  };
   nom.onkeydown=e=>{if(e.key==="Enter")jg.click()};
   nom.focus({preventScroll:true});
 }

@@ -23,9 +23,10 @@ function calcularTiempo(ops,margen=1.2){
 }
 
 /* ============ Plantillas del nivel 1 (Monte Carlo con un dado) ============ */
+const generarRs=(rng,n)=>Array.from({length:n},()=>Math.min(+rng.next().toFixed(4),0.9999));
+
 function tDado(rng,n){
-  const cara=rng.int(1,6),r=new Resolutor(),Rs=[];let veces=0;
-  for(let i=0;i<n;i++)Rs.push(+rng.next().toFixed(4));
+  const cara=rng.int(1,6),r=new Resolutor(),Rs=generarRs(rng,n);let veces=0;
   Rs.forEach((R,i)=>{
     const p=6*R,e=Math.floor(p),c=e+1;
     r.op("arit",`R${i+1} = ${R}: 6 × ${R} = ${p.toFixed(4)}, parte entera = ${e}, más 1 → sale la cara ${c}`,2);
@@ -39,9 +40,9 @@ function tDado(rng,n){
     explicacion:`En Monte Carlo cada número aleatorio R se transforma en un resultado del experimento. Aquí 6R da un valor entre 0 y 6; su parte entera (0 a 5) más 1 es la cara del dado. Después solo se cuentan las veces que apareció la cara ${cara}.`
   };
 }
+
 function tSuma(rng,n){
-  const r=new Resolutor(),Rs=[];let suma=0;
-  for(let i=0;i<n;i++)Rs.push(+rng.next().toFixed(4));
+  const r=new Resolutor(),Rs=generarRs(rng,n);let suma=0;
   Rs.forEach((R,i)=>{
     const p=6*R,e=Math.floor(p),c=e+1,ant=suma;suma+=c;
     r.op("arit",`R${i+1} = ${R}: 6 × ${R} = ${p.toFixed(4)}, parte entera = ${e}, más 1 → cara ${c}; acumulado ${ant} + ${c} = ${suma}`,3);
@@ -52,12 +53,15 @@ function tSuma(rng,n){
     explicacion:`Cada R se convierte en una cara del dado con (parte entera de 6R) + 1. Como en una simulación Monte Carlo se repite el experimento varias veces, aquí se van sumando los resultados de cada tirada.`
   };
 }
+
 /* ============ Plantillas del nivel 2 (generadores congruenciales) ============ */
 const mcd=(a,b)=>b?mcd(b,a%b):a;
+
 function mixtoDatos(rng){
   const m=2**rng.int(4,6),a=4*rng.int(1,Math.min(7,m/4-1))+1,c=2*rng.int(0,m/2-1)+1;
   return{m,a,c,x0:rng.int(1,m-1)};
 }
+
 function iterarMixto(r,{m,a,c,x0},n){
   let x=x0;
   for(let i=1;i<=n;i++){
@@ -68,8 +72,9 @@ function iterarMixto(r,{m,a,c,x0},n){
   }
   return x;
 }
+
 const EXPL_MIXTO=n=>`En un generador congruencial mixto cada valor sale del anterior con Xₙ₊₁ = (a·Xₙ + c) mod m: se multiplica, se suma c y se toma el residuo al dividir entre m. Se repite ${n} ${n===1?"vez":"veces"} a partir de la semilla X₀.`;
-//no se si está bien pero al menos funciona, la tengo q checar una vez q tenga el fondo ya dibujado
+
 function tMixtoX(rng,n){
   const d=mixtoDatos(rng),r=new Resolutor(),x=iterarMixto(r,d,n);
   return{
@@ -77,6 +82,7 @@ function tMixtoX(rng,n){
     respuesta:x,respuestaTexto:`X${n} = ${x}`,pasos:r.pasos,ops:r.ops,explicacion:EXPL_MIXTO(n)
   };
 }
+
 function tMixtoR(rng,n){
   const d=mixtoDatos(rng),r=new Resolutor(),x=iterarMixto(r,d,n),R=x/d.m;
   r.op("arit",`R${n} = X${n} / m = ${x} / ${d.m} = ${R.toFixed(4)}`);
@@ -86,6 +92,7 @@ function tMixtoR(rng,n){
     explicacion:EXPL_MIXTO(n)+` Al final, R = X/m convierte el entero en un número uniforme entre 0 y 1.`
   };
 }
+
 function tMulti(rng,n){
   const m=2**rng.int(5,6),a=8*rng.int(0,3)+rng.pick([3,5]),x0=2*rng.int(0,m/2-1)+1,r=new Resolutor();
   let x=x0;
@@ -101,8 +108,9 @@ function tMulti(rng,n){
     explicacion:`El generador multiplicativo es el caso del mixto con c = 0: Xₙ₊₁ = (a·Xₙ) mod m. Solo se multiplica y se toma el residuo; se repite ${n} ${n===1?"vez":"veces"} desde X₀.`
   };
 }
+
 function tPeriodo(rng,m){
-  let a;do{a=rng.int(2,m-1)}while(mcd(a,m)!==1); // a coprimo con m: la secuencia siempre regresa a X₀
+  let a; do { a = rng.int(2,m-1); } while (mcd(a,m)!==1); // a es coprimo con m: la secuencia siempre regresa a X₀
   const c=rng.int(1,m-1),x0=rng.int(0,m-1),r=new Resolutor();
   let x=x0,k=0;
   do{
@@ -121,16 +129,18 @@ function tPeriodo(rng,m){
 }
 
 function generarProblema(tipo,nivel=G.nivel){
-  const N=NIVELES[nivel-1],{n,t}=N.rango[tipo];let p;
+  const N=NIVELES[nivel-1],{n,t}=N.rango[tipo],mg=N.margen??(nivel>=3?1.6:1.2);let p;
   for(let k=0;k<30;k++){
     p=rng.pick(N.plant[tipo])(rng,rng.int(n[0],n[1]));
-    // modifiqué tiempos: nivel 3 usa tiempo fijo (tfijo) o, si no tiene, tmin + 10 s por campo
-    if(p.tmin){p.tiempo=p.tfijo||Math.max(p.tmin,calcularTiempo(p.ops,p.margen||1.2))+(p.campos?p.campos.length*10:0);p.fuera=false;return p}
-    p.tiempo=calcularTiempo(p.ops);
+    // margen de tiempo: 1.2 en los niveles 1 y 2, 1.6 del nivel 3 en adelante (o el que ponga el nivel en `margen`)
+    // problemas con varios campos: tiempo de las operaciones + 10 s por cada campo extra que hay que escribir
+    if(p.campos){p.tiempo=calcularTiempo(p.ops,mg)+10*(p.campos.length-1);p.fuera=p.tiempo<t[0]||p.tiempo>t[1];return p}
+    p.tiempo=calcularTiempo(p.ops,mg);
     if(p.tiempo>=t[0]&&p.tiempo<=t[1]){p.fuera=false;return p}
   }
   p.fuera=true;p.tiempo=Math.min(Math.max(p.tiempo,t[0]),t[1]);return p;
 }
+
 const acierta=(v,p)=>Math.abs(v-p.respuesta)<=Math.abs(p.respuesta)*0.01+0.0001;
 
 /* ============ Preguntas teóricas (la primera opción es la correcta) ============ */
@@ -156,6 +166,255 @@ const PREG2=[
 {q:"Se les llama números pseudoaleatorios porque…",o:["Salen de una fórmula determinística pero parecen aleatorios","Se obtienen lanzando dados","Nunca se repiten","Son impredecibles aunque se conozca la fórmula"]}
 ];
 
+/* ============ Nivel 3: pruebas de promedios, frecuencias y KS ============ */
+const N3=(function(){
+"use strict";
+
+const RUTA_TABLAS="img/tablas/";
+const f2=x=>x.toFixed(2),f3=x=>x.toFixed(3),f4=x=>x.toFixed(4);
+const suma=a=>a.reduce((s,x)=>s+x,0);
+const clamp=(x,a,b)=>Math.min(Math.max(x,a),b);
+const genRs=(rng,n)=>Array.from({length:n},()=>Math.min(+rng.next().toFixed(4),0.9999));
+const lista=Rs=>Rs.map(f4).join(", ");
+
+const TABLA_Z={5:[0.475,1.96],2:[0.49,2.33],15:[0.425,1.44],20:[0.40,1.28],25:[0.375,1.15]};
+const TABLA_CHI={5:{1:3.84,2:5.99,3:7.81,4:9.49,5:11.07},1:{1:6.63,2:9.21,3:11.34,4:13.28,5:15.09}};
+// KS: d(α, N)
+const TABLA_KS={10:{7:0.438,8:0.411},5:{7:0.486,8:0.457},1:{7:0.577,8:0.543}};
+
+function calcProm(Rs,alfa){
+  const N=Rs.length,S=suma(Rs),xb=S/N;
+  const z0=(xb-0.5)*Math.sqrt(N)/Math.sqrt(1/12);
+  const [area,zt]=TABLA_Z[alfa];
+  return{N,S,xb,z0,area,zt,acepta:Math.abs(z0)<zt};
+}
+function calcFrec(Rs,n,alfa){
+  const N=Rs.length,FE=N/n,FO=Array(n).fill(0);
+  Rs.forEach(R=>FO[Math.min(Math.floor(R*n+1e-9),n-1)]++);
+  const chi=suma(FO.map(o=>(o-FE)**2))/FE,gl=n-1,tabla=TABLA_CHI[alfa][gl];
+  return{N,n,FE,FO,chi,gl,tabla,acepta:chi<tabla};
+}
+function calcKS(Rs,alfa){
+  const N=Rs.length,x=Rs.slice().sort((a,b)=>a-b);
+  const dif=x.map((xi,i)=>Math.abs((i+1)/N-xi));
+  const Dn=Math.max(...dif);
+  const imax=dif.map((d,i)=>Math.abs(d-Dn)<1e-9?i+1:0).filter(Boolean);
+  const tabla=TABLA_KS[alfa][N];
+  return{N,x,dif,Dn,imax,tabla,acepta:Dn<tabla};
+}
+
+const num=(id,label,val,o={})=>({id,kind:"num",label,val,rel:o.rel??0.01,atol:o.atol??0.0001,abs:!!o.abs,valores:o.valores,mostrar:o.mostrar??String(val)});
+const entero=(id,label,val,valores)=>num(id,label,val,{rel:0,atol:1e-9,valores,mostrar:(valores||[val]).join(" o ")});
+const deTabla=(id,label,val,dec)=>num(id,label,val,{rel:0,atol:Math.pow(10,-dec)/2+1e-9,mostrar:val.toFixed(dec)});
+const veredicto=(acepta)=>({id:"ver",kind:"sel",label:"Veredicto",val:acepta?"aceptados":"rechazados",mostrar:acepta?"aceptados":"rechazados"});
+
+function revisar(c,raw){
+  if(c.kind==="sel")return raw===c.val;
+  if(raw===""||raw==null)return false;
+  const v=parseFloat(raw);if(isNaN(v))return false;
+  if(c.valores)return c.valores.some(x=>Math.abs(v-x)<=c.atol);
+  const a=c.abs?Math.abs(v):v,b=c.abs?Math.abs(c.val):c.val;
+  return Math.abs(a-b)<=Math.abs(b)*c.rel+c.atol;
+}
+
+function tPromedios(rng,n){
+  n=clamp(n,4,6);
+  const alfa=rng.pick([5,2,15,20,25]),Rs=genRs(rng,n),c=calcProm(Rs,alfa),r=new Resolutor();
+  const comp=Math.abs(c.z0);
+  r.op("arit",`Suma de los ${n} números: ${Rs.map(f4).join(" + ")} = ${f4(c.S)}`,n-1);
+  r.op("arit",`X̄ = ΣR / N = ${f4(c.S)} / ${n} = ${f4(c.xb)}`);
+  r.op("arit",`Z₀ = (X̄ − 1/2)·√N / √(1/12) = (${f4(c.xb)} − 0.5)·√${n} / √(1/12)`,3);
+  r.op("func",`√${n} = ${f4(Math.sqrt(n))} y √(1/12) = 0.2887, así que Z₀ = ${f4(c.z0)}`,2);
+  r.op("arit",`α real = 100% − ${alfa}% = ${100-alfa}% = ${(100-alfa)/100}; entre 2: ${c.area}`,2);
+  r.op("tabla",`En la tabla Z se busca ${c.area} (o el valor más cercano): Z = ${f2(c.zt)}`);
+  r.op("comp",`|Z₀| = ${f4(comp)} ${c.acepta?"<":"≥"} ${f2(c.zt)} → los números son ${c.acepta?"aceptados":"rechazados"}`);
+  return{
+    enunciado:`Prueba de promedios con α = ${alfa}% y N = ${n} números rectangulares: ${lista(Rs)}. Calcula el promedio, Z₀, el valor Z de la tabla (Z<sub>α real/2</sub>) y decide si los números rectangulares son aceptados o rechazados.`,
+    respuesta:c.z0,respuestaTexto:`X̄ = ${f4(c.xb)}; Z₀ = ${f4(c.z0)}; Z = ${f2(c.zt)}; ${c.acepta?"aceptados":"rechazados"}`,
+    pasos:r.pasos,ops:r.ops,
+    explicacion:`Se aceptan los números si |Z₀| es menor que el Z de la tabla.`,
+    campos:[
+      num("xb","Promedio X̄",c.xb,{mostrar:f4(c.xb)}),
+      num("z0","Z₀ (con o sin signo)",c.z0,{abs:true,mostrar:f4(Math.abs(c.z0))}),
+      deTabla("zt","Valor Z de la tabla",c.zt,2),
+      veredicto(c.acepta)
+    ]
+  };
+}
+
+function tFrecuencias(rng,N){
+  const jefe=N>=7;
+  N=jefe?clamp(N,8,10):clamp(N,4,6);
+  const n=jefe?rng.pick([4,5]):rng.pick([2,3]),alfa=rng.pick([5,1]);
+  const Rs=genRs(rng,N),c=calcFrec(Rs,n,alfa),r=new Resolutor();
+  const lim=k=>[k/n,(k+1)/n].map(f4).join(" a ");
+  Rs.forEach((R,i)=>{
+    const k=Math.min(Math.floor(R*n+1e-9),n-1);
+    r.op("clasif",`R${i+1} = ${f4(R)} cae en el intervalo ${k+1} (${lim(k)})`);
+  });
+  r.op("arit",`FE = N / n = ${N} / ${n} = ${c.FE}`);
+  r.op("arit",`FO por intervalo: ${c.FO.map((o,k)=>`${k+1}→${o}`).join(", ")}`,0);
+  r.op("arit",`Diferencias: ${c.FO.map(o=>`(${o} − ${c.FE})`).join(", ")}`,n);
+  r.op("func",`Al cuadrado: ${c.FO.map(o=>f4((o-c.FE)**2)).join(", ")}`,n);
+  r.op("arit",`χ²₀ = (1/FE)·Σ(FO − FE)² = (1/${c.FE})·${f4(suma(c.FO.map(o=>(o-c.FE)**2)))} = ${f4(c.chi)}`,n-1+1);
+  r.op("arit",`Grados de libertad = n − 1 = ${c.gl}`);
+  r.op("tabla",`En la tabla χ², gl = ${c.gl} y α = ${alfa}%: χ² = ${f2(c.tabla)}`);
+  r.op("comp",`χ²₀ = ${f4(c.chi)} ${c.acepta?"<":"≥"} ${f2(c.tabla)} → los números son ${c.acepta?"aceptados":"rechazados"}`);
+  return{
+    enunciado:`Prueba de frecuencias con α = ${alfa}%, n = ${n} intervalos iguales entre 0 y 1 y N = ${N} números rectangulares: ${lista(Rs)}. Calcula FE, la FO de cada intervalo, χ²₀, el valor χ² de la tabla y decide si los números son aceptados o rechazados.`,
+    respuesta:c.chi,respuestaTexto:`FE = ${c.FE}; FO = ${c.FO.join(", ")}; χ²₀ = ${f4(c.chi)}; χ² tabla = ${f2(c.tabla)}; ${c.acepta?"aceptados":"rechazados"}`,
+    pasos:r.pasos,ops:r.ops,
+    explicacion:`Se aceptan los números si χ²₀ es menor que el χ² de la tabla.`,
+    campos:[
+      num("fe","FE (frecuencia esperada)",c.FE,{mostrar:String(c.FE)}),
+      ...c.FO.map((o,k)=>entero("fo"+k,`FO del intervalo ${k+1} (${lim(k)})`,o)),
+      num("chi","χ²₀",c.chi,{mostrar:f4(c.chi)}),
+      deTabla("tb","Valor χ² de la tabla",c.tabla,2),
+      veredicto(c.acepta)
+    ]
+  };
+}
+
+function tKS(rng,N){
+  N=clamp(N,7,8);
+  const alfa=rng.pick([10,5,1]),Rs=genRs(rng,N),c=calcKS(Rs,alfa),r=new Resolutor();
+  const k=rng.int(2,N-1);
+  r.op("orden",`Números ordenados de menor a mayor: ${lista(c.x)}`,N);
+  c.x.forEach((xi,i)=>{
+    r.op("arit",`i = ${i+1}: F(xᵢ) = ${i+1}/${N} = ${f4((i+1)/N)}; |F(xᵢ) − xᵢ| = |${f4((i+1)/N)} − ${f4(xi)}| = ${f4(c.dif[i])}`,2);
+  });
+  r.op("comp",`El mayor valor es Dₙ = ${f4(c.Dn)}, en i = ${c.imax.join(" o ")}`,N-1);
+  r.op("tabla",`En la tabla KS, N = ${N} y α = ${alfa}%: d = ${f3(c.tabla)}`);
+  r.op("comp",`Dₙ = ${f4(c.Dn)} ${c.acepta?"<":"≥"} ${f3(c.tabla)} → los números son ${c.acepta?"aceptados":"rechazados"}`);
+  return{
+    enunciado:`Prueba de Kolmogorov-Smirnov con α = ${alfa}% y N = ${N} números rectangulares: ${lista(Rs)}. Ordénalos de menor a mayor, calcula Dₙ = máx |F(xᵢ) − xᵢ| con F(xᵢ) = i/N y decide si son aceptados o rechazados.`,
+    respuesta:c.Dn,respuestaTexto:`posición ${k}: ${f4(c.x[k-1])}; Dₙ = ${f4(c.Dn)} en i = ${c.imax.join(" o ")}; d = ${f3(c.tabla)}; ${c.acepta?"aceptados":"rechazados"}`,
+    pasos:r.pasos,ops:r.ops,
+    explicacion:`Se aceptan los números si el mayor Dₙ es menor que el d de la tabla.`,
+    campos:[
+      num("xk",`Número en la posición ${k} al ordenar`,c.x[k-1],{rel:0,atol:0.00005,mostrar:f4(c.x[k-1])}),
+      entero("im","Posición i donde ocurre la mayor diferencia",c.imax[0],c.imax),
+      num("dn","Dₙ",c.Dn,{mostrar:f4(c.Dn)}),
+      deTabla("dt","Valor d de la tabla",c.tabla,3),
+      veredicto(c.acepta)
+    ]
+  };
+}
+
+function tMonMedia(rng,n){
+  n=clamp(n,4,6);
+  const Rs=genRs(rng,n),S=suma(Rs),xb=S/n,r=new Resolutor();
+  r.op("arit",`Suma: ${Rs.map(f4).join(" + ")} = ${f4(S)}`,n-1);
+  r.op("arit",`X̄ = ${f4(S)} / ${n} = ${f4(xb)}`);
+  return{
+    enunciado:`Calcula el promedio (media aritmética) de estos ${n} números rectangulares: ${lista(Rs)}.`,
+    respuesta:xb,respuestaTexto:`X̄ = ${f4(xb)}`,pasos:r.pasos,ops:r.ops,
+    explicacion:`El promedio es la suma de los números entre la cantidad de números.`,
+    campos:[num("xb","Promedio X̄",xb,{mostrar:f4(xb)})]
+  };
+}
+function tMonFO(rng,n){
+  n=clamp(n,4,6);
+  const Rs=genRs(rng,n),k=rng.int(0,3),r=new Resolutor();let cuenta=0;
+  Rs.forEach((R,i)=>{
+    const j=Math.min(Math.floor(R*4+1e-9),3),dentro=j===k;if(dentro)cuenta++;
+    r.op("clasif",`R${i+1} = ${f4(R)} cae en el intervalo ${j+1}: ${dentro?"se cuenta":"no se cuenta"}`);
+  });
+  return{
+    enunciado:`Se divide el intervalo de 0 a 1 en 4 partes iguales. ¿Cuántos de estos ${n} números caen en el intervalo ${k+1} (de ${f4(k/4)} a ${f4((k+1)/4)})? Números: ${lista(Rs)}.`,
+    respuesta:cuenta,respuestaTexto:`${cuenta}`,pasos:r.pasos,ops:r.ops,
+    explicacion:`La frecuencia observada (FO) de un intervalo es la cantidad de números que caen en él.`,
+    campos:[entero("fo","Cantidad de números en ese intervalo",cuenta)]
+  };
+}
+
+const st=document.createElement("style");
+st.textContent=`
+.campos{text-align:left;margin:8px 0}
+.campo{display:flex;align-items:center;gap:8px;margin:6px 0;flex-wrap:wrap}
+.campo label{flex:1 1 55%;font-size:13px}
+.campo input{flex:1 1 30%;width:auto;min-width:90px;padding:5px}
+.campo .vbs{flex:1 1 30%}
+.vb{margin:0 4px 0 0;padding:5px 8px;font-size:13px;background:var(--bg);color:var(--fg)}
+.vb.sel{background:var(--ok);color:#fff}
+.tablas{text-align:left;margin:6px 0}
+.tablas summary{cursor:pointer;font-weight:700;margin:4px 0}
+.tablas img{width:100%;height:auto;display:block;background:#fff;border:2px solid var(--line);image-rendering:auto}
+`;
+document.head.appendChild(st);
+
+const TABLAS=[["Distribución normal (Z)","tabla_z.png"],["Distribución χ²","tabla_chi.png"],["Kolmogorov-Smirnov (d α,N)","tabla_ks.png"]];
+const tablasHTML=()=>`<button id="vt" type="button">📖 Ver tablas</button><div id="tb" class="tablas" hidden>`+
+  TABLAS.map(([t,f])=>`<details><summary>${t}</summary><a href="${RUTA_TABLAS}${f}" target="_blank" rel="noopener"><img src="${RUTA_TABLAS}${f}" alt="${t}" loading="lazy"></a></details>`).join("")+`</div>`;
+
+function leerCampo(c){
+  if(c.kind==="sel"){const b=panelEl.querySelector(`.vb.sel[data-c="${c.id}"]`);return b?b.dataset.v:""}
+  const el=document.getElementById("f_"+c.id);return el?el.value.trim():"";
+}
+
+function problemaCampos(p,tipo,ok,fail){
+  const titulo=tipo==="jefe"?icono("jefe","👹")+" Jefe final":tipo==="monstruo"?icono("monstruo"+(G.seg+1),"👹")+" Monstruo "+(G.seg+1):"💀 Problema para revivir";
+  const campos=p.campos.map(c=>c.kind==="sel"
+    ?`<div class="campo"><label>${c.label}</label><span class="vbs"><button type="button" class="vb" data-c="${c.id}" data-v="aceptados">Aceptados</button><button type="button" class="vb" data-c="${c.id}" data-v="rechazados">Rechazados</button></span></div>`
+    :`<div class="campo"><label for="f_${c.id}">${c.label}</label><input id="f_${c.id}" type="number" step="any" inputmode="decimal"></div>`).join("");
+  panel(`<h3>${titulo}</h3><p>${p.enunciado}</p>${tablasHTML()}
+  <div class="barra"><i id="b"></i></div><p id="t">${p.tiempo} s</p>
+  <div class="campos">${campos}</div><button id="rs" type="button">Responder</button><p id="fb"></p>`,tipo!=="revivir");
+  const tb=document.getElementById("tb");
+  document.getElementById("vt").onclick=()=>{tb.hidden=!tb.hidden};
+  panelEl.querySelectorAll(".vb").forEach(b=>b.onclick=()=>{
+    panelEl.querySelectorAll(`.vb[data-c="${b.dataset.c}"]`).forEach(x=>x.classList.toggle("sel",x===b));
+  });
+  const base=p.explicacion;let listo=false;
+  const terminar=(bien,motivo)=>{
+    if(listo)return;listo=true;clearInterval(tm);
+    const fb=document.getElementById("fb");
+    emitirSonido(bien?"correcto":"incorrecto");
+    if(bien){fb.innerHTML='<span class="ok">¡Correcto!</span>';setTimeout(ok,900)}
+    else{
+      const lineas=p.campos.map(c=>{
+        const raw=leerCampo(c),b=revisar(c,raw);
+        return `${b?"✅":"❌"} ${c.label}: ${raw===""?"sin respuesta":"tu respuesta "+raw}${b?"":` (correcta: ${c.mostrar})`}`;
+      });
+      p.explicacion=lineas.join("<br>")+"<br><br>"+base;
+      fb.innerHTML=`<span class="mal">${motivo==="tiempo"?"Se acabó el tiempo.":"Hay respuestas incorrectas."}</span>`;
+      setTimeout(()=>fail(p),900);
+    }
+  };
+  const enviar=()=>{
+    const raws=p.campos.map(leerCampo);
+    if(raws.some(x=>x==="")){document.getElementById("fb").innerHTML='<span class="mal">Llena todos los campos.</span>';return}
+    terminar(p.campos.every((c,i)=>revisar(c,raws[i])),"error");
+  };
+  document.getElementById("rs").onclick=enviar;
+  panelEl.querySelectorAll(".campo input").forEach(i=>i.onkeydown=e=>{if(e.key==="Enter")enviar()});
+  const primero=panelEl.querySelector(".campo input");if(primero)primero.focus({preventScroll:true});
+  timer(p.tiempo,l=>{document.getElementById("b").style.width=(l/p.tiempo*100)+"%";document.getElementById("t").textContent=Math.ceil(l)+" s"},()=>terminar(false,"tiempo"));
+}
+
+function problemaMonstruo(){
+  const p=generarProblema("monstruo");
+  problemaCampos(p,"monstruo",
+    ()=>{G.puntos+=5;G.seg++;retomar()},
+    p=>{G.hearts--;hud();solucion(p,()=>G.hearts<=0?fin("Fallaste el problema del monstruo y no quedan corazones."):revivir())});
+}
+
+function irANivel(n=3,seg=0){G.nivel=n;G.seg=seg;G.preg=rng.shuffle(NV().preg);retomar()}
+
+return{tPromedios,tFrecuencias,tKS,tMonMedia,tMonFO,problemaCampos,problemaMonstruo,irANivel,calcProm,calcFrec,calcKS,revisar};
+})();
+const {tPromedios,tFrecuencias,tKS,tMonMedia,tMonFO,problemaCampos,problemaMonstruo,irANivel}=N3;
+
+const PREG3=[
+{q:"La prueba de promedios compara…",o:["El promedio de los números generados con el valor esperado 0.5","Las frecuencias observadas con las esperadas","La distribución acumulada con la uniforme","La cantidad de pares y tercias de dígitos"]},
+{q:"En la prueba de promedios, los números se aceptan cuando…",o:["|Z₀| es menor que el valor Z de la tabla","Z₀ es mayor que el valor Z de la tabla","El promedio es exactamente 0.5","N es un número par"]},
+{q:"La prueba de frecuencias compara…",o:["Las frecuencias observadas (FO) con las esperadas (FE) en cada intervalo","El promedio con 0.5","El mayor valor con el menor valor","Cada número con el número anterior"]},
+{q:"En la prueba de frecuencias con n intervalos, los grados de libertad son…",o:["n − 1","n + 1","N − 1","n · N"]},
+{q:"Con N números y n intervalos iguales, la frecuencia esperada FE es…",o:["N / n","n / N","N · n","N − n"]},
+{q:"La prueba de Kolmogorov-Smirnov compara…",o:["La distribución acumulada de los números con la de una uniforme","Solo el promedio de los números","La cantidad de números repetidos","El período del generador"]},
+{q:"En la prueba KS, el estadístico Dₙ es…",o:["La mayor diferencia absoluta entre F(xᵢ) y xᵢ","La suma de todas las diferencias","El menor valor de xᵢ","El promedio de los xᵢ"]},
+{q:"En la prueba KS, los números se rechazan si…",o:["Dₙ es mayor o igual que el valor d de la tabla","Dₙ es menor que el valor d de la tabla","N es menor que 10","α es menor que 5%"]}
+];
 const VELOCIDAD_TUBOS=110,LAMBDA_TUBOS=0.6;
 const NIVELES=[
   {tema:"introducción a la simulación y factores del modelo",vel:VELOCIDAD_TUBOS,lambda:LAMBDA_TUBOS,preg:PREG1,
@@ -164,9 +423,9 @@ const NIVELES=[
   {tema:"generación de números rectangulares",vel:VELOCIDAD_TUBOS,lambda:LAMBDA_TUBOS,preg:PREG2,
    plant:{revivir:[tMixtoX,tMixtoR,tMulti],jefe:[tPeriodo]},
    rango:{revivir:{n:[2,4],t:[60,105]},jefe:{n:[8,9],t:[180,240]}}}, // en el jefe, n es el valor de m
-  {tema:"pruebas de promedios, frecuencias y KS",vel:VELOCIDAD_TUBOS,lambda:LAMBDA_TUBOS,preg:[],sinTeoria:true,
+  {tema:"pruebas de promedios, frecuencias y KS",vel:VELOCIDAD_TUBOS,lambda:LAMBDA_TUBOS,preg:PREG3,
    plant:{revivir:[tPromedios,tFrecuencias],jefe:[tKS,tFrecuencias],monstruo:[tMonMedia,tMonFO]},
-   rango:{revivir:{n:[4,6],t:[90,120]},jefe:{n:[7,10],t:[150,180]},monstruo:{n:[4,6],t:[40,70]}}} // modifiqué tiempos: aquí el tiempo real viene de nivel3.js
+   rango:{revivir:{n:[4,6],t:[150,240]},jefe:{n:[7,10],t:[235,335]},monstruo:{n:[4,6],t:[40,100]}}} // tiempo = operaciones × margen + 10 s por campo extra
 ];
 
 /* ============ Juego ============ */
@@ -175,7 +434,7 @@ const NV=()=>NIVELES[G.nivel-1];
 const cv=document.getElementById("c"),g=cv.getContext("2d"),panelEl=document.getElementById("panel");
 const G={};let tm=null;
 const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
-const AudioContexto=window.AudioContext||window.webkitAudioContext;
+const AudioContexto=window.AudioContext||window.webkitAudioContext||null;
 const botonSonido=document.getElementById("audioToggle");
 const wrapEl=document.getElementById("wrap"),botonPantalla=document.getElementById("fullscreenToggle");
 const sonidos={
@@ -377,7 +636,6 @@ function monstruo(){
   G.enemigoX=W;G.pipes=[];G.corazones=[];G.y=H/2;G.vy=0;
 }
 function enfrentarMonstruo(){
-  //esta chingadera esta toda bugegeada y no sirve para nada, pero la dejo por si acaso
   G.estado="pausa";
   if(G.seg<2){NV().sinTeoria?problemaMonstruo():pregunta()}else problema("jefe",()=>{G.puntos+=15;G.enfrentamiento=null;nivelCompleto()},p=>{
     G.enfrentamiento=null;
@@ -487,7 +745,7 @@ const CORAZON_PIXEL=["01100110","11211121","11111111","11111111","01111110","001
 function dibujarCorazon(c){
   const escala=2,x0=Math.round(c.x-8),y0=Math.round(c.y-7);
   CORAZON_PIXEL.forEach((fila,y)=>[...fila].forEach((px,x)=>{
-    if(px!=="0"){g.fillStyle=px==="2"?"#ff5555":"#d90020";g.fillRect(x0+x*escala,y0+y*escala,escala,escala)} //no supe como dibujar esta chingadera con fillRect, así que lo hice pixel por pixel, pero al menos se ve bonito
+    if(px!=="0"){g.fillStyle=px==="2"?"#ff5555":"#d90020";g.fillRect(x0+x*escala,y0+y*escala,escala,escala)}
   }));
 }
 

@@ -129,12 +129,12 @@ function tPeriodo(rng,m){
 }
 
 function generarProblema(tipo,nivel=G.nivel){
-  const N=NIVELES[nivel-1],{n,t}=N.rango[tipo],mg=N.margen??(nivel>=3?1.6:1.2);let p;
+  const N=NIVELES[nivel-1],{n,t}=N.rango[tipo],mg=N.margen??(nivel>=3?2:1.2);let p;
   for(let k=0;k<30;k++){
     p=rng.pick(N.plant[tipo])(rng,rng.int(n[0],n[1]));
-    // margen de tiempo: 1.2 en los niveles 1 y 2, 1.6 del nivel 3 en adelante (o el que ponga el nivel en `margen`)
-    // problemas con varios campos: tiempo de las operaciones + 10 s por cada campo extra que hay que escribir
-    if(p.campos){p.tiempo=calcularTiempo(p.ops,mg)+10*(p.campos.length-1);p.fuera=p.tiempo<t[0]||p.tiempo>t[1];return p}
+    // margen de tiempo: 1.2 en los niveles 1 y 2, 2.0 del nivel 3 en adelante (o el que ponga el nivel en `margen`)
+    // problemas con varios campos: tiempo de las operaciones + 15 s por cada campo extra que hay que escribir
+    if(p.campos){p.tiempo=calcularTiempo(p.ops,mg)+15*(p.campos.length-1);p.fuera=p.tiempo<t[0]||p.tiempo>t[1];return p}
     p.tiempo=calcularTiempo(p.ops,mg);
     if(p.tiempo>=t[0]&&p.tiempo<=t[1]){p.fuera=false;return p}
   }
@@ -328,6 +328,162 @@ function tMonFO(rng,n){
   };
 }
 
+/* ---- Nivel 4: series, póker y distancias (números de 5 decimales) ---- */
+const f5=x=>x.toFixed(5);
+const R5=rng=>Math.min(+rng.next().toFixed(5),0.99999);
+const MANOS=["Todos diferentes","Un par","Dos pares","Tercia","Full","Póker","Quintilla"];
+const PM=[0.3024,0.5040,0.1080,0.0720,0.0090,0.0045,0.0001];
+const PM_SESGO=[0.15,0.40,0.20,0.15,0.06,0.03,0.01];
+const FORMA=[[1,1,1,1,1],[2,1,1,1],[2,2,1],[3,1,1],[3,2],[4,1],[5]];
+const strNum=d=>"0."+d.join("");
+const listaD=ds=>ds.map(strNum).join(", ");
+const catDe=P=>rngU=>{let s=0;for(let i=0;i<P.length;i++){s+=P[i];if(rngU<s)return i}return P.length-1};
+function manoDigitos(rng,t){
+  const ds=rng.shuffle([0,1,2,3,4,5,6,7,8,9]),out=[];
+  FORMA[t].forEach((m,i)=>{for(let k=0;k<m;k++)out.push(ds[i])});
+  return rng.shuffle(out);
+}
+function manoDe(d){
+  const c={};d.forEach(x=>c[x]=(c[x]||0)+1);
+  const clave=Object.values(c).sort((a,b)=>b-a).join("");
+  return FORMA.findIndex(f=>f.join("")===clave);
+}
+function distanciaDe(d){ // dígitos entre los dos dígitos repetidos (exactamente un par)
+  for(let i=0;i<5;i++)for(let j=i+1;j<5;j++)if(d[i]===d[j])return j-i-1;
+  return -1;
+}
+function numeroConDistancia(rng,dist){
+  const ds=rng.shuffle([0,1,2,3,4,5,6,7,8,9]),a=rng.int(0,3-dist),out=Array(5).fill(null);
+  out[a]=out[a+dist+1]=ds[0];let k=1;
+  for(let i=0;i<5;i++)if(out[i]===null)out[i]=ds[k++];
+  return out;
+}
+
+function tSeries(rng,N){
+  const jefe=N>=9; // en el jefe también se piden FE y los grados de libertad
+  const alfa=rng.pick([5,1]),Rs=Array.from({length:N},()=>R5(rng)),r=new Resolutor();
+  const P=N-1,FE=P/4,FO=[0,0,0,0];
+  const lab=["Uᵢ < 0.5 y Uᵢ₊₁ < 0.5","Uᵢ < 0.5 y Uᵢ₊₁ ≥ 0.5","Uᵢ ≥ 0.5 y Uᵢ₊₁ < 0.5","Uᵢ ≥ 0.5 y Uᵢ₊₁ ≥ 0.5"];
+  for(let i=0;i<P;i++){
+    const q=(Rs[i]>=0.5?2:0)+(Rs[i+1]>=0.5?1:0);FO[q]++;
+    r.op("clasif",`Pareja ${i+1}: (${f5(Rs[i])}, ${f5(Rs[i+1])}) cae en el cuadrante ${q+1} (${lab[q]})`);
+  }
+  const s=suma(FO.map(o=>(o-FE)**2)),chi=4/P*s,gl=3,tabla=TABLA_CHI[alfa][gl],acepta=chi<tabla;
+  r.op("arit",`FE = (N − 1) / n² = ${P} / 4 = ${FE}`,2);
+  r.op("arit",`FO por cuadrante: ${FO.map((o,k)=>`${k+1}→${o}`).join(", ")}; diferencias ${FO.map(o=>`(${o} − ${FE})`).join(", ")}`,4);
+  r.op("func",`Al cuadrado: ${FO.map(o=>f4((o-FE)**2)).join(", ")}`,4);
+  r.op("arit",`Σ(FO − FE)² = ${f4(s)}`,3);
+  r.op("arit",`χ²₀ = (n² / (N − 1))·Σ(FO − FE)² = (4 / ${P})·${f4(s)} = ${f4(chi)}`,2);
+  r.op("arit",`Grados de libertad = n² − 1 = ${gl}`);
+  r.op("tabla",`En la tabla χ², gl = ${gl} y α = ${alfa}%: χ² = ${f2(tabla)}`);
+  r.op("comp",`χ²₀ = ${f4(chi)} ${acepta?"<":"≥"} ${f2(tabla)} → los números son ${acepta?"aceptados":"rechazados"}`);
+  return{
+    enunciado:`Prueba de series con α = ${alfa}%, n = 2 y N = ${N} números rectangulares: ${Rs.map(f5).join(", ")}. Forma las ${P} parejas (Uᵢ, Uᵢ₊₁) y cuéntalas en los 4 cuadrantes (cada eje se divide en 0 a 0.5 y 0.5 a 1). Calcula χ²₀ = (n²/(N − 1))·Σ(FO − FE)², el valor χ² de la tabla y decide si los números son aceptados o rechazados.`,
+    respuesta:chi,respuestaTexto:`FE = ${FE}; FO = ${FO.join(", ")}; χ²₀ = ${f4(chi)}; χ² tabla = ${f2(tabla)}; ${acepta?"aceptados":"rechazados"}`,
+    pasos:r.pasos,ops:r.ops,
+    explicacion:`En la prueba de series se forman las N − 1 parejas (Uᵢ, Uᵢ₊₁) y se ubican en un plano dividido en n × n celdas; con n = 2 hay 4 cuadrantes y FE = (N − 1)/n². Se aceptan los números si χ²₀ es menor que el χ² de la tabla con n² − 1 grados de libertad.`,
+    campos:[
+      ...(jefe?[num("fe","FE (frecuencia esperada por cuadrante)",(N-1)/4,{mostrar:String((N-1)/4)})]:[]),
+      ...FO.map((o,k)=>entero("fo"+k,`FO cuadrante ${k+1} (${lab[k]})`,o)),
+      num("chi","χ²₀",chi,{mostrar:f4(chi)}),
+      ...(jefe?[entero("gl","Grados de libertad",gl)]:[]),
+      deTabla("tb","Valor χ² de la tabla",tabla,2),
+      veredicto(acepta)
+    ]
+  };
+}
+
+function tPoker(rng,N){
+  N=clamp(N,10,14);
+  const alfa=rng.pick([5,1]),Pm=rng.next()<0.55?PM:PM_SESGO,sorteo=catDe(Pm),r=new Resolutor();
+  let nums,FO;
+  do{
+    nums=Array.from({length:N},()=>manoDigitos(rng,sorteo(rng.next())));
+    FO=Array(7).fill(0);nums.forEach(d=>FO[manoDe(d)]++);
+  }while(FO[1]===0||FO[1]===N); // debe salir al menos un «Un par» y al menos una mano de las otras categorías
+  const FE=PM.map(p=>p*N),grup=[],solas=[],omitidas=[];
+  nums.forEach(d=>{
+    const t=manoDe(d);
+    r.op("clasif",`${strNum(d)} → dígitos ${d.join(" ")}: ${MANOS[t]}`);
+  });
+  // se agrupan las categorías con FE < 5 que SÍ salieron; las que no salieron (FO = 0) no se suman
+  FE.forEach((e,i)=>{if(e<5){(FO[i]>0?grup:omitidas).push(i)}else solas.push(i)});
+  const FOa=suma(grup.map(i=>FO[i])),FEa=suma(grup.map(i=>FE[i])),FOp=FO[1],FEp=FE[1];
+  // N de 10 a 14: solo «Un par» tiene FE ≥ 5, así que siempre quedan 2 grupos (las agrupadas y «Un par»)
+  const chi=(FOa-FEa)**2/FEa+(FOp-FEp)**2/FEp,gl=1,tabla=TABLA_CHI[alfa][gl],acepta=chi<tabla;
+  r.op("arit",`FE = probabilidad × N: ${FE.map((e,i)=>`${MANOS[i]} ${f4(e)}`).join("; ")}`,0);
+  r.op("arit",`FE de «Un par» = 0.5040 × ${N} = ${f4(FEp)}`);
+  r.op("arit",`Categorías con FE menor que 5 que sí salieron: ${grup.map(i=>`${MANOS[i]} (FE ${f4(FE[i])}, FO ${FO[i]})`).join("; ")}`,grup.length);
+  if(omitidas.length)r.op("arit",`No se suman las que no salieron (FO = 0): ${omitidas.map(i=>MANOS[i]).join(", ")}`,0);
+  r.op("arit",`FE agrupada = ${grup.map(i=>f4(FE[i])).join(" + ")} = ${f4(FEa)}`,grup.length-1);
+  r.op("arit",`FO agrupada = ${grup.map(i=>FO[i]).join(" + ")} = ${FOa}`,grup.length-1);
+  r.op("arit",`Diferencias: (${FOa} − ${f4(FEa)}) y (${FOp} − ${f4(FEp)})`,2);
+  r.op("func",`Al cuadrado: ${f4((FOa-FEa)**2)} y ${f4((FOp-FEp)**2)}`,2);
+  r.op("arit",`χ²₀ = ${f4((FOa-FEa)**2)} / ${f4(FEa)} + ${f4((FOp-FEp)**2)} / ${f4(FEp)} = ${f4(chi)}`,3);
+  r.op("arit",`Grados de libertad = 2 grupos − 1 = ${gl}`);
+  r.op("tabla",`En la tabla χ², gl = ${gl} y α = ${alfa}%: χ² = ${f2(tabla)}`);
+  r.op("comp",`χ²₀ = ${f4(chi)} ${acepta?"<":"≥"} ${f2(tabla)} → los números son ${acepta?"aceptados":"rechazados"}`);
+  return{
+    enunciado:`Prueba de póker con α = ${alfa}% y N = ${N} números rectangulares (se usan los 5 decimales como una mano de 5 dígitos): ${listaD(nums)}. Clasifica cada número (todos diferentes, un par, dos pares, tercia, full, póker o quintilla), calcula FE = probabilidad × N y agrupa las categorías con FE menor que 5 que sí salieron (las que no aparecen en los números, con FO = 0, no se suman); después calcula χ²₀, el valor χ² de la tabla y decide si los números son aceptados o rechazados.<br>Probabilidades: todos diferentes 0.3024, un par 0.5040, dos pares 0.1080, tercia 0.0720, full 0.0090, póker 0.0045, quintilla 0.0001.`,
+    respuesta:chi,respuestaTexto:`FO un par = ${FOp}; FO agrupada = ${FOa}; FE agrupada = ${f4(FEa)}; χ²₀ = ${f4(chi)}; χ² tabla = ${f2(tabla)}; ${acepta?"aceptados":"rechazados"}`,
+    pasos:r.pasos,ops:r.ops,
+    explicacion:`En la prueba de póker cada número se clasifica por los dígitos que se repiten. Como las categorías con FE menor que 5 no sirven para la prueba por sí solas, se agrupan, pero solo las que sí salieron: las que no aparecen en los números no se suman. Aquí «Un par» queda separada, así que hay 2 grupos y 1 grado de libertad. Se aceptan los números si χ²₀ es menor que el χ² de la tabla.`,
+    campos:[
+      entero("fop","FO de «Un par»",FOp),
+      num("fea","FE agrupada (categorías con FE < 5 que sí salieron)",FEa,{mostrar:f4(FEa)}),
+      num("chi","χ²₀",chi,{mostrar:f4(chi)}),
+      deTabla("tb","Valor χ² de la tabla",tabla,2),
+      veredicto(acepta)
+    ]
+  };
+}
+
+function tDistancias(rng,N){
+  N=clamp(N,10,14);
+  const alfa=rng.pick([5,1]),Pd=rng.next()<0.5?[0.1,0.09,0.081,0.729]:[0.35,0.30,0.20,0.15],sorteo=catDe(Pd),r=new Resolutor();
+  let nums,FO;
+  do{
+    nums=Array.from({length:N},()=>numeroConDistancia(rng,sorteo(rng.next())));
+    FO=[0,0,0,0];nums.forEach(d=>FO[distanciaDe(d)]++);
+  }while(FO[3]===0||FO[0]+FO[1]+FO[2]===0); // debe salir al menos una distancia 3 y alguna de 0, 1 o 2
+  const FE=[0.1*N,0.1*0.9*N,0.1*0.81*N,0.729*N];
+  nums.forEach(d=>{
+    const i=distanciaDe(d);
+    r.op("clasif",`${strNum(d)} → dígitos ${d.join(" ")}: distancia ${i}`);
+  });
+  // se agrupan las distancias 0, 1 y 2 (FE < 5) que SÍ salieron; las que no salieron (FO = 0) no se suman
+  const filas=[0,1,2].filter(i=>FO[i]>0),omit=[0,1,2].filter(i=>FO[i]===0);
+  const FOa=suma(filas.map(i=>FO[i])),FEa=suma(filas.map(i=>FE[i])),FO3=FO[3],FE3=FE[3];
+  // N de 10 a 14: FE₀, FE₁ y FE₂ son menores que 5 y FE₃ es mayor que 5, así que siempre quedan 2 grupos
+  const chi=(FOa-FEa)**2/FEa+(FO3-FE3)**2/FE3,gl=1,tabla=TABLA_CHI[alfa][gl],acepta=chi<tabla;
+  r.op("arit",`FEᵢ = (0.1)(0.9)ⁱ·N para i < 3: ${[0,1,2].map(i=>f4(FE[i])).join(", ")}; FE₃ = (0.9)³·N = ${f4(FE3)}`,0);
+  r.op("arit",`FE₃ = (0.9)³·N = 0.729 × ${N} = ${f4(FE3)}`);
+  r.op("arit",`Distancias con FE menor que 5 que sí salieron: ${filas.map(i=>`i = ${i} (FE ${f4(FE[i])}, FO ${FO[i]})`).join("; ")}`,filas.length);
+  if(omit.length)r.op("arit",`No se suman las que no salieron (FO = 0): i = ${omit.join(", ")}`,0);
+  r.op("arit",`FE agrupada = ${filas.map(i=>f4(FE[i])).join(" + ")} = ${f4(FEa)}`,filas.length-1);
+  r.op("arit",`FO agrupada = ${filas.map(i=>FO[i]).join(" + ")} = ${FOa}`,filas.length-1);
+  r.op("arit",`Diferencias: (${FOa} − ${f4(FEa)}) y (${FO3} − ${f4(FE3)})`,2);
+  r.op("func",`Al cuadrado: ${f4((FOa-FEa)**2)} y ${f4((FO3-FE3)**2)}`,2);
+  r.op("arit",`χ²₀ = ${f4((FOa-FEa)**2)} / ${f4(FEa)} + ${f4((FO3-FE3)**2)} / ${f4(FE3)} = ${f4(chi)}`,3);
+  r.op("arit",`Grados de libertad = 2 grupos − 1 = ${gl}`);
+  r.op("tabla",`En la tabla χ², gl = ${gl} y α = ${alfa}%: χ² = ${f2(tabla)}`);
+  r.op("comp",`χ²₀ = ${f4(chi)} ${acepta?"<":"≥"} ${f2(tabla)} → los números son ${acepta?"aceptados":"rechazados"}`);
+  return{
+    enunciado:`Prueba de distancias con α = ${alfa}% y N = ${N} números rectangulares (cada uno tiene un dígito que se repite en sus 5 decimales): ${listaD(nums)}. La distancia i es la cantidad de dígitos que hay entre los dos dígitos iguales. Cuenta la FO de cada distancia (0, 1, 2 y 3), calcula FEᵢ = (0.1)(0.9)ⁱ·N para i < 3 y FE₃ = (0.9)³·N, agrupa las FE menores que 5 de las distancias que sí salieron (las que no aparecen, con FO = 0, no se suman), calcula χ²₀, el valor χ² de la tabla y decide si los números son aceptados o rechazados.`,
+    respuesta:chi,respuestaTexto:`FO = ${FO.join(", ")}; FE agrupada = ${f4(FEa)}; χ²₀ = ${f4(chi)}; χ² tabla = ${f2(tabla)}; ${acepta?"aceptados":"rechazados"}`,
+    pasos:r.pasos,ops:r.ops,
+    explicacion:`En la prueba de distancias se cuenta cuántos dígitos separan a los dos dígitos repetidos de cada número. Las categorías con FE menor que 5 se agrupan (las distancias 0, 1 y 2 que sí salieron; las que no aparecen no se suman) y la última (i = 3) queda sola, así que hay 2 grupos y 1 grado de libertad. Se aceptan los números si χ²₀ es menor que el χ² de la tabla.`,
+    campos:[
+      entero("fo0","FO de la distancia 0",FO[0]),
+      entero("fo3","FO de la distancia 3",FO[3]),
+      num("fea","FE agrupada (distancias 0, 1 y 2 que sí salieron)",FEa,{mostrar:f4(FEa)}),
+      num("chi","χ²₀",chi,{mostrar:f4(chi)}),
+      deTabla("tb","Valor χ² de la tabla",tabla,2),
+      veredicto(acepta)
+    ]
+  };
+}
+
 const st=document.createElement("style");
 st.textContent=`
 .campos{text-align:left;margin:8px 0}
@@ -401,9 +557,9 @@ function problemaMonstruo(){
 
 function irANivel(n=3,seg=0){G.nivel=n;G.seg=seg;G.preg=rng.shuffle(NV().preg);retomar()}
 
-return{tPromedios,tFrecuencias,tKS,tMonMedia,tMonFO,problemaCampos,problemaMonstruo,irANivel,calcProm,calcFrec,calcKS,revisar};
+return{tPromedios,tFrecuencias,tKS,tMonMedia,tMonFO,tSeries,tPoker,tDistancias,problemaCampos,problemaMonstruo,irANivel,calcProm,calcFrec,calcKS,revisar};
 })();
-const {tPromedios,tFrecuencias,tKS,tMonMedia,tMonFO,problemaCampos,problemaMonstruo,irANivel}=N3;
+const {tPromedios,tFrecuencias,tKS,tMonMedia,tMonFO,tSeries,tPoker,tDistancias,problemaCampos,problemaMonstruo,irANivel}=N3;
 
 const PREG3=[
 {q:"La prueba de promedios compara…",o:["El promedio de los números generados con el valor esperado 0.5","Las frecuencias observadas con las esperadas","La distribución acumulada con la uniforme","La cantidad de pares y tercias de dígitos"]},
@@ -415,7 +571,18 @@ const PREG3=[
 {q:"En la prueba KS, el estadístico Dₙ es…",o:["La mayor diferencia absoluta entre F(xᵢ) y xᵢ","La suma de todas las diferencias","El menor valor de xᵢ","El promedio de los xᵢ"]},
 {q:"En la prueba KS, los números se rechazan si…",o:["Dₙ es mayor o igual que el valor d de la tabla","Dₙ es menor que el valor d de la tabla","N es menor que 10","α es menor que 5%"]}
 ];
+const PREG4=[
+{q:"En la prueba de póker, cada número rectangular se clasifica según…",o:["Los dígitos que se repiten en sus 5 decimales (la mano de póker)","Su promedio","La distancia al número anterior","El cuadrante donde cae"]},
+{q:"¿Cuántas categorías de mano hay en la prueba de póker con 5 dígitos?",o:["7: todos diferentes, un par, dos pares, tercia, full, póker y quintilla","5: una por cada dígito","4: una por cada palo","10: una por cada dígito del 0 al 9"]},
+{q:"En póker, un «full» es…",o:["Una tercia y un par (por ejemplo, 8 8 8 5 5)","Cuatro dígitos iguales","Dos pares","Cinco dígitos diferentes"]},
+{q:"En póker y distancias, ¿qué categorías se agrupan?",o:["Las que tienen una frecuencia esperada (FE) menor que 5","Las que tienen FO igual a cero","Las que tienen FE mayor que 5","Todas las categorías, siempre"]},
+{q:"En la prueba de series, con N números rectangulares se forman…",o:["N − 1 parejas (Uᵢ, Uᵢ₊₁)","N parejas","N / 2 parejas","N² parejas"]},
+{q:"En la prueba de series con una cuadrícula de n × n celdas, la frecuencia esperada es…",o:["FE = (N − 1) / n²","FE = N / n","FE = (N − 1) · n²","FE = n² / N"]},
+{q:"En la prueba de series con n = 2, los grados de libertad son…",o:["3 (n² − 1)","2 (n)","1 (n − 1)","4 (n²)"]},
+{q:"En la prueba de distancias, la distancia i es…",o:["La cantidad de dígitos que hay entre dos dígitos iguales","La diferencia entre dos números consecutivos","El valor del dígito repetido","La posición del primer dígito"]}
+];
 const VELOCIDAD_TUBOS=110,LAMBDA_TUBOS=0.6;
+const tSeriesCorta=(rng,n)=>tSeries(rng,n<=11?5:6); // en revivir n va de 10 a 12 (póker y distancias); series usa 5 o 6 números
 const NIVELES=[
   {tema:"introducción a la simulación y factores del modelo",vel:VELOCIDAD_TUBOS,lambda:LAMBDA_TUBOS,preg:PREG1,
    plant:{revivir:[tDado,tSuma],jefe:[tDado,tSuma]},
@@ -425,7 +592,10 @@ const NIVELES=[
    rango:{revivir:{n:[2,4],t:[60,105]},jefe:{n:[8,9],t:[180,240]}}}, // en el jefe, n es el valor de m
   {tema:"pruebas de promedios, frecuencias y KS",vel:VELOCIDAD_TUBOS,lambda:LAMBDA_TUBOS,preg:PREG3,
    plant:{revivir:[tPromedios,tFrecuencias],jefe:[tKS,tFrecuencias],monstruo:[tMonMedia,tMonFO]},
-   rango:{revivir:{n:[4,6],t:[150,240]},jefe:{n:[7,10],t:[235,335]},monstruo:{n:[4,6],t:[40,100]}}} // tiempo = operaciones × margen + 10 s por campo extra
+   rango:{revivir:{n:[4,6],t:[195,315]},jefe:{n:[7,10],t:[305,440]},monstruo:{n:[4,6],t:[40,150]}}}, // tiempo = operaciones × margen + 15 s por campo extra
+  {tema:"pruebas de series, póker y distancias",vel:VELOCIDAD_TUBOS,lambda:LAMBDA_TUBOS,preg:PREG4,
+   plant:{revivir:[tPoker,tDistancias,tSeriesCorta],jefe:[tSeries]},
+   rango:{revivir:{n:[10,12],t:[300,425]},jefe:{n:[9,12],t:[395,435]}}} // revivir: n = N de póker y distancias (10 a 12); series usa 5 o 6. Jefe: series con 9 a 12 números
 ];
 const MODO_DESARROLLADOR=new URLSearchParams(location.search).get("dev")==="1";
 

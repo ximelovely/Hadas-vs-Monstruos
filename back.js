@@ -513,11 +513,11 @@ function problemaCampos(p,tipo,ok,fail){
   const campos=p.campos.map(c=>c.kind==="sel"
     ?`<div class="campo"><label>${c.label}</label><span class="vbs"><button type="button" class="vb" data-c="${c.id}" data-v="aceptados">Aceptados</button><button type="button" class="vb" data-c="${c.id}" data-v="rechazados">Rechazados</button></span></div>`
     :`<div class="campo"><label for="f_${c.id}">${c.label}</label><input id="f_${c.id}" type="number" step="any" inputmode="decimal"></div>`).join("");
-  panel(`<h3>${titulo}</h3><p>${p.enunciado}</p>${tablasHTML()}
+  panel(`<h3>${titulo}</h3><p>${p.enunciado}</p>${p.sinTablas?"":tablasHTML()}
   <div class="barra"><i id="b"></i></div><p id="t">${p.tiempo} s</p>
   <div class="campos">${campos}</div><button id="rs" type="button">Responder</button><p id="fb"></p>`,tipo!=="revivir");
-  const tb=document.getElementById("tb");
-  document.getElementById("vt").onclick=()=>{tb.hidden=!tb.hidden};
+  const tb=document.getElementById("tb"),vt=document.getElementById("vt");
+  if(vt)vt.onclick=()=>{tb.hidden=!tb.hidden};
   panelEl.querySelectorAll(".vb").forEach(b=>b.onclick=()=>{
     panelEl.querySelectorAll(`.vb[data-c="${b.dataset.c}"]`).forEach(x=>x.classList.toggle("sel",x===b));
   });
@@ -557,7 +557,7 @@ function problemaMonstruo(){
 
 function irANivel(n=3,seg=0){G.nivel=n;G.seg=seg;G.preg=rng.shuffle(NV().preg);retomar()}
 
-return{tPromedios,tFrecuencias,tKS,tMonMedia,tMonFO,tSeries,tPoker,tDistancias,problemaCampos,problemaMonstruo,irANivel,calcProm,calcFrec,calcKS,revisar};
+return{tPromedios,tFrecuencias,tKS,tMonMedia,tMonFO,tSeries,tPoker,tDistancias,problemaCampos,problemaMonstruo,irANivel,calcProm,calcFrec,calcKS,revisar,ayudas:{num,entero,f4,suma,clamp}};
 })();
 const {tPromedios,tFrecuencias,tKS,tMonMedia,tMonFO,tSeries,tPoker,tDistancias,problemaCampos,problemaMonstruo,irANivel}=N3;
 
@@ -581,6 +581,168 @@ const PREG4=[
 {q:"En la prueba de series con n = 2, los grados de libertad son…",o:["3 (n² − 1)","2 (n)","1 (n − 1)","4 (n²)"]},
 {q:"En la prueba de distancias, la distancia i es…",o:["La cantidad de dígitos que hay entre dos dígitos iguales","La diferencia entre dos números consecutivos","El valor del dígito repetido","La posición del primer dígito"]}
 ];
+const PREG5=[
+// conceptuales (la mayoría)
+{q:"¿Por qué son importantes las variables aleatorias no uniformes?",o:["Son pieza fundamental de cualquier simulación; sin ellas no existiría la simulación","Solo sirven para probar generadores","Reemplazan a los números rectangulares","Se usan únicamente al final para validar el modelo"]},
+{q:"¿Qué método se usa para generar variables aleatorias no uniformes en este tema?",o:["La transformada inversa","La prueba de Kolmogorov-Smirnov","La prueba de póker","El método de la burbuja"]},
+{q:"Los tiempos de atención a los clientes de un cajero automático se simulan con una distribución…",o:["Exponencial","Uniforme","Poisson","Empírica"]},
+{q:"Los tiempos de transmisión de mensajes de texto entre celulares del ejemplo de clase se simulan con una distribución…",o:["Empírica","Exponencial","Uniforme","Poisson"]},
+{q:"En la distribución Poisson, ¿qué es λ?",o:["La media estadística de la variable aleatoria","El valor máximo de x","La cantidad de números rectangulares","El nivel de significancia"]},
+{q:"En Poisson, la distribución acumulada F(x) sirve para…",o:["Armar la tabla de rangos con la que se obtiene el valor de la variable","Calcular el período del generador","Decidir si los números son uniformes","Obtener el promedio de los R"]},
+{q:"¿Cuándo se deja de calcular f(x) y F(x) en Poisson?",o:["Cuando F(x) se acerca de forma considerable a 1","Cuando f(x) llega a 0.5","Cuando x es igual a λ","Cuando F(x) es negativa"]},
+{q:"En la tabla de rangos de Poisson, el valor de x se obtiene…",o:["Buscando el rango de F(x) donde cae el número R","Multiplicando R por λ","Eligiendo el x con mayor f(x)","Calculando el logaritmo de R"]},
+// de fórmulas (pocas)
+{q:"La fórmula de la distribución uniforme entre a y b es…",o:["x = a + (b − a)·R","x = −(1/λ)·ln R","x = (a + b) / R","x = a·R + b²"]},
+{q:"La probabilidad de la distribución Poisson es…",o:["f(x) = e^(−λ)·λ^x / x!","f(x) = −(1/λ)·ln R","f(x) = a + (b − a)·R","f(x) = λ·R²"]}
+];
+
+/* ============ Nivel 5: variables no uniformes y Poisson ============ */
+const N5=(function(){
+"use strict";
+const {num,entero,f4,suma,clamp}=N3.ayudas;
+const genR=(rng,n)=>Array.from({length:n},()=>Math.min(Math.max(+rng.next().toFixed(4),0.0001),0.9999)); // R nunca es 0 (ln 0 no existe)
+const listaR=Rs=>Rs.map(f4).join(", ");
+const fact=n=>n<2?1:n*fact(n-1);
+const otra=(rng,n,j)=>{let k;do{k=rng.int(1,n)}while(k===j);return k};
+
+const CTX_EXP=[
+  {frase:"Los tiempos de atención de los clientes de un cajero",item:"cliente",items:"clientes"},
+  {frase:"Los tiempos entre llegadas de monstruos al bosque",item:"monstruo",items:"monstruos"},
+  {frase:"Los tiempos de reparación de las alas de las hadas",item:"hada",items:"hadas"}
+];
+const CTX_UNI=[
+  {frase:"Los tiempos de envasado de un refresco",item:"refresco",items:"refrescos"},
+  {frase:"Los tiempos de preparación de una poción",item:"poción",items:"pociones"},
+  {frase:"Los tiempos de vuelo de un hada entre dos árboles",item:"vuelo",items:"vuelos"}
+];
+
+/* ---- Exponencial (transformada inversa) ---- */
+function tExponencial(rng,N){
+  const jefe=N>=8;N=jefe?clamp(N,8,9):clamp(N,4,6);
+  const lam=rng.pick([2,3,4,5]),c=rng.pick(CTX_EXP),Rs=genR(rng,N),r=new Resolutor();
+  const k=-1/lam,ln=Rs.map(R=>Math.log(R)),xs=ln.map(l=>k*l),S=suma(xs),prom=S/N;
+  r.op("arit",`−1/λ = −1/${lam} = ${f4(k)}`);
+  Rs.forEach((R,i)=>{
+    r.op("func",`ln(${f4(R)}) = ${f4(ln[i])}`);
+    r.op("arit",`x${i+1} = −(1/λ)·ln R${i+1} = ${f4(k)} × ${f4(ln[i])} = ${f4(xs[i])}`);
+  });
+  r.op("arit",`Tiempo total = ${xs.map(f4).join(" + ")} = ${f4(S)}`,N-1);
+  r.op("arit",`Tiempo promedio = ${f4(S)} / ${N} = ${f4(prom)}`);
+  const j=rng.int(1,N),campos=[num("xj",`Tiempo del ${c.item} ${j}`,xs[j-1],{mostrar:f4(xs[j-1])})];
+  if(jefe){
+    const j2=otra(rng,N,j),mx=Math.max(...xs);
+    r.op("comp",`El mayor tiempo es ${f4(mx)} (${c.item} ${xs.indexOf(mx)+1})`,N-1);
+    campos.push(num("xj2",`Tiempo del ${c.item} ${j2}`,xs[j2-1],{mostrar:f4(xs[j2-1])}));
+    campos.push(num("mx","Mayor de los tiempos",mx,{mostrar:f4(mx)}));
+  }
+  campos.push(num("tot","Tiempo total",S,{mostrar:f4(S)}),num("prom","Tiempo promedio",prom,{mostrar:f4(prom)}));
+  return{
+    enunciado:`${c.frase} están exponencialmente distribuidos con λ = ${lam}, con x = −(1/λ)·ln R. Con los ${N} números rectangulares R = ${listaR(Rs)}, calcula el tiempo de ${N} ${c.items}${jefe?", el tiempo mayor":""}, el tiempo total y el tiempo promedio (4 decimales).`,
+    respuesta:S,respuestaTexto:`Tiempo total = ${f4(S)}; promedio = ${f4(prom)}`,pasos:r.pasos,ops:r.ops,sinTablas:true,
+    explicacion:`En la transformada inversa de la exponencial cada R se convierte en un tiempo con x = −(1/λ)·ln R. Después se suman los tiempos y el total se divide entre ${N} para el promedio.`,
+    campos
+  };
+}
+
+/* ---- Uniforme entre a y b ---- */
+function tUniforme(rng,N){
+  N=clamp(N,4,6);
+  const a=rng.int(2,6),b=a+rng.int(2,6),c=rng.pick(CTX_UNI),Rs=genR(rng,N),r=new Resolutor();
+  const xs=Rs.map(R=>a+(b-a)*R),S=suma(xs),prom=S/N;
+  r.op("arit",`b − a = ${b} − ${a} = ${b-a}`);
+  Rs.forEach((R,i)=>{
+    r.op("arit",`x${i+1} = a + (b − a)·R${i+1} = ${a} + ${b-a} × ${f4(R)} = ${f4(xs[i])}`,2);
+  });
+  r.op("arit",`Tiempo total = ${xs.map(f4).join(" + ")} = ${f4(S)}`,N-1);
+  r.op("arit",`Tiempo promedio = ${f4(S)} / ${N} = ${f4(prom)}`);
+  const j=rng.int(1,N);
+  return{
+    enunciado:`${c.frase} están uniformemente distribuidos entre ${a} y ${b} min, con x = a + (b − a)·R. Con los ${N} números rectangulares R = ${listaR(Rs)}, calcula el tiempo de ${N} ${c.items}, el tiempo total y el tiempo promedio (4 decimales).`,
+    respuesta:S,respuestaTexto:`Tiempo total = ${f4(S)}; promedio = ${f4(prom)}`,pasos:r.pasos,ops:r.ops,sinTablas:true,
+    explicacion:`En la distribución uniforme cada R se acomoda entre a y b con x = a + (b − a)·R. Después se suman los tiempos y el total se divide entre ${N} para el promedio.`,
+    campos:[
+      num("xj",`Tiempo del ${c.item} ${j}`,xs[j-1],{mostrar:f4(xs[j-1])}),
+      num("tot","Tiempo total",S,{mostrar:f4(S)}),
+      num("prom","Tiempo promedio",prom,{mostrar:f4(prom)})
+    ]
+  };
+}
+
+/* ---- Empírica: x = √(2R) ---- */
+const CTX_EMP=[
+  {frase:"Los tiempos de transmisión de mensajes de texto de un celular a otro",item:"mensaje",items:"mensajes"},
+  {frase:"Los tiempos que tarda un monstruo en cruzar el bosque",item:"monstruo",items:"monstruos"},
+  {frase:"Los tiempos de carga de un hechizo",item:"hechizo",items:"hechizos"}
+];
+function tEmpirica(rng,N){
+  const jefe=N>=8;N=jefe?clamp(N,8,9):clamp(N,4,6);
+  const c=rng.pick(CTX_EMP),Rs=genR(rng,N),r=new Resolutor();
+  const bajo=Rs.map(R=>R<=0.5),xs=Rs.map((R,i)=>bajo[i]?Math.sqrt(2*R):2*R),S=suma(xs),prom=S/N,men=bajo.filter(Boolean).length;
+  Rs.forEach((R,i)=>{
+    r.op("comp",`R${i+1} = ${f4(R)} ${bajo[i]?"≤":">"} 1/2`);
+    if(bajo[i]){
+      r.op("arit",`2R${i+1} = 2 × ${f4(R)} = ${f4(2*R)}`);
+      r.op("func",`x${i+1} = √(2R${i+1}) = √${f4(2*R)} = ${f4(xs[i])}`);
+    }else r.op("arit",`x${i+1} = 2R${i+1} = 2 × ${f4(R)} = ${f4(xs[i])}`);
+  });
+  r.op("arit",`Tiempo total = ${xs.map(f4).join(" + ")} = ${f4(S)}`,N-1);
+  r.op("arit",`Tiempo promedio = ${f4(S)} / ${N} = ${f4(prom)}`);
+  const j=rng.int(1,N),campos=[num("xj",`Tiempo del ${c.item} ${j}`,xs[j-1],{mostrar:f4(xs[j-1])})];
+  if(jefe){const j2=otra(rng,N,j);campos.push(num("xj2",`Tiempo del ${c.item} ${j2}`,xs[j2-1],{mostrar:f4(xs[j2-1])}))}
+  campos.push(entero("men","Cantidad de R menores o iguales que 1/2 (usan la raíz)",men),num("tot","Tiempo total",S,{mostrar:f4(S)}),num("prom","Tiempo promedio",prom,{mostrar:f4(prom)}));
+  return{
+    enunciado:`${c.frase} están empíricamente distribuidos: x = √(2R) si R ≤ 1/2 y x = 2R si R > 1/2. Con los ${N} números rectangulares R = ${listaR(Rs)}, calcula el tiempo de ${N} ${c.items}, cuántos R son menores o iguales que 1/2, el tiempo total y el tiempo promedio (4 decimales).`,
+    respuesta:S,respuestaTexto:`${men} R ≤ 1/2; tiempo total = ${f4(S)}; promedio = ${f4(prom)}`,pasos:r.pasos,ops:r.ops,sinTablas:true,
+    explicacion:`En la distribución empírica la fórmula depende de R: si R ≤ 1/2 se usa x = √(2R) y si R > 1/2 se usa x = 2R. Después se suman los tiempos y el total se divide entre ${N} para el promedio.`,
+    campos
+  };
+}
+
+/* ---- Poisson ---- */
+const CTX_POI=[
+  {frase:"La demanda diaria de pociones",pers:"cada uno de los N días"},
+  {frase:"El número de monstruos que llegan al bosque por hora",pers:"cada una de las N horas"}
+];
+function tPoisson(rng,N){
+  N=clamp(N,8,9);
+  const lam=rng.pick([1,1.5,2]),c=rng.pick(CTX_POI),r=new Resolutor(),e=Math.exp(-lam);
+  const xs=[],f=[],F=[];
+  r.op("func",`e^(−λ) = e^(−${lam}) = ${f4(e)}`);
+  for(let x=0,ac=0;ac<0.98;x++){
+    const pot=lam**x,fx=e*pot/fact(x);ac+=fx;xs.push(x);f.push(fx);F.push(ac);
+    r.op("func",`λ^${x} = ${lam}^${x} = ${f4(pot)}`);
+    r.op("fact",`${x}! = ${fact(x)}`);
+    r.op("arit",`f(${x}) = e^(−λ)·λ^${x} / ${x}! = ${f4(e)} × ${f4(pot)} / ${fact(x)} = ${f4(fx)}`,2);
+    r.op("arit",x?`F(${x}) = ${f4(F[x-1])} + ${f4(fx)} = ${f4(ac)}`:`F(0) = f(0) = ${f4(fx)}`,x?1:0);
+  }
+  const L=xs.length,ult=xs[L-1],tope=F[L-1];
+  r.pasos.push(`Se detiene en x = ${ult}, porque F(${ult}) = ${f4(tope)} ya es mayor o igual que 0.98.`);
+  r.pasos.push(`Tabla de rangos: ${xs.map(x=>`x = ${x} → ${f4(x?F[x-1]:0)} a ${f4(F[x])}`).join("; ")}`);
+  let Rs;
+  do{Rs=Array.from({length:N},()=>Math.min(Math.max(+(rng.next()*tope).toFixed(4),0.0001),+(tope-0.0001).toFixed(4)))}
+  while(Rs.some(R=>F.some(v=>Math.abs(R-v)<0.0003))); // ningún R pegado a un límite del rango
+  const val=Rs.map(R=>F.findIndex(v=>R<v));
+  Rs.forEach((R,i)=>r.op("clasif",`R${i+1} = ${f4(R)} cae en el rango de ${f4(val[i]?F[val[i]-1]:0)} a ${f4(F[val[i]])} → x = ${val[i]}`));
+  const tot=suma(val);
+  r.op("arit",`Suma de los valores de x = ${val.join(" + ")} = ${tot}`,N-1);
+  const k1=rng.int(1,L-1),k2=rng.int(1,L-2),j=rng.int(1,N);
+  return{
+    enunciado:`${c.frase} tiene un comportamiento Poisson con λ = ${lam}. Calcula f(x) = e<sup>−λ</sup>·λ<sup>x</sup> / x! y la acumulada F(x) desde x = 0 hasta que F(x) sea mayor o igual que 0.98. Con ellas arma la tabla de rangos (para x = 0 el rango va de 0 a F(0) y para cada x siguiente de F(x−1) a F(x)) y, con los ${N} números rectangulares R = ${listaR(Rs)}, obtén el valor de x de ${c.pers.replace("N",N)} (4 decimales en f y F).`,
+    respuesta:tot,respuestaTexto:`f(${k1}) = ${f4(f[k1])}; F(${k2}) = ${f4(F[k2])}; último x = ${ult}; x de R${j} = ${val[j-1]}; suma = ${tot}`,pasos:r.pasos,ops:r.ops,sinTablas:true,
+    explicacion:`En Poisson se calculan f(x) y la acumulada F(x) hasta que F(x) se acerca a 1; con esos valores se arma la tabla de rangos. Cada R se ubica en el rango donde cae y ese rango da el valor de x.`,
+    campos:[
+      num("f",`f(${k1})`,f[k1],{mostrar:f4(f[k1])}),
+      num("F",`F(${k2})`,F[k2],{mostrar:f4(F[k2])}),
+      entero("ult","Último valor de x de la tabla (primer x con F(x) ≥ 0.98)",ult),
+      entero("xj",`Valor de x que le toca a R${j}`,val[j-1]),
+      entero("tot",`Suma de los ${N} valores de x`,tot)
+    ]
+  };
+}
+
+return{tExponencial,tUniforme,tEmpirica,tPoisson};
+})();
+const {tExponencial,tUniforme,tEmpirica,tPoisson}=N5;
 const VELOCIDAD_TUBOS=110,LAMBDA_TUBOS=0.6;
 const tSeriesCorta=(rng,n)=>tSeries(rng,n<=11?5:6); // en revivir n va de 10 a 12 (póker y distancias); series usa 5 o 6 números
 const NIVELES=[
@@ -595,7 +757,10 @@ const NIVELES=[
    rango:{revivir:{n:[4,6],t:[195,315]},jefe:{n:[7,10],t:[305,440]},monstruo:{n:[4,6],t:[40,150]}}}, // tiempo = operaciones × margen + 15 s por campo extra
   {tema:"pruebas de series, póker y distancias",vel:VELOCIDAD_TUBOS,lambda:LAMBDA_TUBOS,preg:PREG4,
    plant:{revivir:[tPoker,tDistancias,tSeriesCorta],jefe:[tSeries]},
-   rango:{revivir:{n:[10,12],t:[300,425]},jefe:{n:[9,12],t:[395,435]}}} // revivir: n = N de póker y distancias (10 a 12); series usa 5 o 6. Jefe: series con 9 a 12 números
+   rango:{revivir:{n:[10,12],t:[300,425]},jefe:{n:[9,12],t:[395,435]}}}, // revivir: n = N de póker y distancias (10 a 12); series usa 5 o 6. Jefe: series con 9 a 12 números
+  {tema:"variables no uniformes y Poisson",vel:VELOCIDAD_TUBOS,lambda:LAMBDA_TUBOS,preg:PREG5,
+   plant:{revivir:[tExponencial,tUniforme,tEmpirica],jefe:[tPoisson,tExponencial,tEmpirica]},
+   rango:{revivir:{n:[4,6],t:[165,280]},jefe:{n:[8,9],t:[270,525]}}} // revivir: uniforme, exponencial o empírica con 4 a 6 R. Jefe: Poisson, exponencial o empírica con 8 a 9 R
 ];
 const MODO_DESARROLLADOR=new URLSearchParams(location.search).get("dev")==="1";
 

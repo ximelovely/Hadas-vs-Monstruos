@@ -73,7 +73,7 @@ body {
 #wrap {
   container-type: inline-size;
   position: relative;
-  width: min(960px, 100%);
+  width: min(988px, 100%); /* deja sitio justo para el canvas a 2× (960 px + bordes) */
   padding: 8px;
   background: var(--card);
   border: 3px solid var(--line);
@@ -135,8 +135,6 @@ canvas {
 #wrap:fullscreen canvas {
   width: auto;
   height: min(90vh, 50.625vw);
-  max-width: 90vw;
-  max-height: 90vh;
 }
 
 #wrap:fullscreen #panel {
@@ -162,6 +160,53 @@ canvas {
 
 #panel.encuentro {
   background: color-mix(in srgb, var(--card) 72%, transparent);
+}
+
+/* Paneles de juego: azul noche con borde dorado, como la portada */
+#panel:not(.inicio) {
+  --bg: #171a32;
+  --fg: #f8edcf;
+  --card: #1d2142;
+  --line: #a9a2c9;
+  --acc: #d9536f;
+  --bad: #ff747a;
+  --ok: #79d6a5;
+  --shadow: #090d20;
+  color: var(--fg);
+  background: rgba(23, 26, 50, 0.96);
+  border-color: #ffd479;
+  box-shadow: 5px 5px 0 #090d20;
+}
+
+#panel.encuentro:not(.inicio) {
+  background: rgba(23, 26, 50, 0.84);
+}
+
+#panel:not(.inicio) h1,
+#panel:not(.inicio) h2,
+#panel:not(.inicio) h3 {
+  color: #ffd479;
+}
+
+#panel:not(.inicio) .barra {
+  background: #090d20;
+  border-color: #ffd479;
+}
+
+/* Iconos pixel art (se dibujan en JS a escala entera) */
+.ico {
+  display: inline-block;
+  vertical-align: middle;
+  image-rendering: pixelated;
+}
+
+.ico + .ico {
+  margin-left: 3px;
+}
+
+#audioToggle .ico,
+#fullscreenToggle .ico {
+  display: block;
 }
 
 #panel h1,

@@ -1,0 +1,43 @@
+{
+  "name": "hadas-vs-monstruos",
+  "version": "1.0.1",
+  "private": true,
+  "description": "Juego educativo Hadas vs Monstruos",
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "dist": "node build-win.cjs"
+  },
+  "build": {
+    "appId": "com.hadasvsmonstruos.game",
+    "productName": "Hadas vs Monstruos",
+    "asar": true,
+    "files": [
+      "index.html",
+      "back.js",
+      "diseño.css",
+      "img/**/*",
+      "main.cjs"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "portable": {
+      "artifactName": "Hadas-vs-Monstruos-Portable-${version}.${ext}"
+    }
+  },
+  "devDependencies": {
+    "electron": "^45.4.1",
+    "electron-builder": "^26.0.12"
+  }
+}

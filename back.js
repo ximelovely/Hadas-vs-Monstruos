@@ -927,7 +927,11 @@ function inicio(){
     </div>
     <div class="elige">Elige a tu hada</div>
     <div id="hs" role="group" aria-label="Elige a tu hada"></div>
-    ${MODO_DESARROLLADOR?`<div class="dev-tools"><label for="nivelPrueba">Nivel de prueba</label><select id="nivelPrueba">${NIVELES.map((nivel,i)=>`<option value="${i+1}">Nivel ${i+1}</option>`).join("")}</select></div>`:""}
+    ${MODO_DESARROLLADOR?`<div class="dev-tools" aria-label="Herramientas de prueba">
+      <div class="dev-control"><label for="nivelPrueba">Nivel</label><select id="nivelPrueba">${NIVELES.map((nivel,i)=>`<option value="${i+1}">Nivel ${i+1}</option>`).join("")}</select></div>
+      <div class="dev-control"><label for="tipoProblema">Problema</label><select id="tipoProblema"></select></div>
+      <button id="probarProblema" type="button" class="probar">Probar problema</button>
+    </div>`:""}
     <button id="jugar" class="jugar" type="button">Jugar</button>
     <p class="pista">Espacio o clic = aletear</p>
     <details class="como"><summary>¿Cómo se juega?</summary>
@@ -938,6 +942,27 @@ function inicio(){
   ajustarPortada();
   document.getElementById("rp").textContent=r.puntos>0?`Récord ${r.puntos} · ${r.nombre}`:"Aún sin récord";
   const nom=document.getElementById("nom");nom.value=NOMBRE;nom.oninput=()=>{NOMBRE=nom.value};
+  if(MODO_DESARROLLADOR){
+    const nivelPrueba=document.getElementById("nivelPrueba");
+    const tipoProblema=document.getElementById("tipoProblema");
+    const actualizarTipos=()=>{
+      const nivel=Number(nivelPrueba.value);
+      const plant=NIVELES[nivel-1].plant;
+      const tipos=["revivir","jefe"];
+      if(plant.monstruo)tipos.push("monstruo");
+      tipoProblema.innerHTML=tipos.map(tipo=>`<option value="${tipo}">${tipo==="revivir"?"Revivir":tipo==="jefe"?"Jefe final":"Monstruo"}</option>`).join("");
+    };
+    nivelPrueba.onchange=actualizarTipos;
+    actualizarTipos();
+    document.getElementById("probarProblema").onclick=()=>{
+      NOMBRE=nom.value.trim()||"Jugador";
+      nuevo();
+      G.nivel=Number(nivelPrueba.value);
+      G.seg=0;
+      G.preg=rng.shuffle(NV().preg);
+      probarProblema(tipoProblema.value);
+    };
+  }
   const hs=document.getElementById("hs");
   const elegir=i=>{SEL=i;emitirSonido("seleccion");hs.querySelectorAll(".card").forEach((e,j)=>{e.classList.toggle("sel",j===i);e.setAttribute("aria-pressed",j===i)})};
   HADAS.forEach((h,i)=>{
@@ -1109,6 +1134,35 @@ function solucion(p,sig){
   <p>${p.explicacion}</p><ol id="ps"></ol><button id="sg">Continuar</button>`);
   p.pasos.forEach((t,i)=>setTimeout(()=>{const li=document.createElement("li");li.textContent=t;const o=document.getElementById("ps");if(o)o.appendChild(li)},i*500));
   document.getElementById("sg").onclick=sig;
+}
+function probarProblema(tipo){
+  G.estado="pausa";
+  const p=generarProblema(tipo);
+  const mostrarSolucion=()=>solucion(p,()=>inicio());
+  if(p.campos)return problemaCampos(p,tipo,mostrarSolucion,()=>mostrarSolucion());
+  panel(`<h3>${tipo==="jefe"?"👹 Jefe final":tipo==="monstruo"?"👹 Monstruo":"💀 Problema para revivir"}</h3><p>${p.enunciado}</p>
+  <div class="barra"><i id="b"></i></div><p id="t">${p.tiempo} s</p>
+  <input id="in" type="number" step="any" inputmode="decimal" placeholder="Tu respuesta"> <button id="rs">Responder</button><p id="fb"></p>`,tipo==="jefe");
+  const inp=document.getElementById("in");
+  let listo=false;
+  const terminar=bien=>{
+    if(listo)return;
+    listo=true;
+    clearInterval(tm);
+    emitirSonido(bien?"correcto":"incorrecto");
+    document.getElementById("fb").innerHTML=bien?'<span class="ok">¡Correcto!</span>':'<span class="mal">Incorrecto o se acabó el tiempo.</span>';
+    setTimeout(mostrarSolucion,900);
+  };
+  document.getElementById("rs").onclick=()=>{
+    const v=parseFloat(inp.value);
+    if(!isNaN(v))terminar(acierta(v,p));
+  };
+  inp.onkeydown=e=>{if(e.key==="Enter")document.getElementById("rs").click()};
+  inp.focus({preventScroll:true});
+  timer(p.tiempo,l=>{
+    document.getElementById("b").style.width=(l/p.tiempo*100)+"%";
+    document.getElementById("t").textContent=Math.ceil(l)+" s";
+  },()=>terminar(false));
 }
 function aletear(){if(G.estado==="vuelo"){G.vy=FLAP;emitirSonido("aleteo")}}
 cv.addEventListener("pointerdown",aletear);

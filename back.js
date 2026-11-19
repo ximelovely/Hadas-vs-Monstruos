@@ -500,7 +500,7 @@ st.textContent=`
 document.head.appendChild(st);
 
 const TABLAS=[["Distribución normal (Z)","tabla_z.png"],["Distribución χ²","tabla_chi.png"],["Kolmogorov-Smirnov (d α,N)","tabla_ks.png"]];
-const tablasHTML=()=>`<button id="vt" type="button">📖 Ver tablas</button><div id="tb" class="tablas" hidden>`+
+const tablasHTML=()=>`<button id="vt" type="button">${ico("libro",2)} Ver tablas</button><div id="tb" class="tablas" hidden>`+
   TABLAS.map(([t,f])=>`<details><summary>${t}</summary><a href="${RUTA_TABLAS}${f}" target="_blank" rel="noopener"><img src="${RUTA_TABLAS}${f}" alt="${t}" loading="lazy"></a></details>`).join("")+`</div>`;
 
 function leerCampo(c){
@@ -509,7 +509,7 @@ function leerCampo(c){
 }
 
 function problemaCampos(p,tipo,ok,fail){
-  const titulo=tipo==="jefe"?icono("jefe","👹")+" Jefe final":tipo==="monstruo"?icono("monstruo"+(G.seg+1),"👹")+" Monstruo "+(G.seg+1):"💀 Problema para revivir";
+  const titulo=tipo==="jefe"?icono("jefe",ico("monstruo",3))+" Jefe final":tipo==="monstruo"?icono("monstruo"+(G.seg+1),ico("monstruo",3))+" Monstruo "+(G.seg+1):ico("calavera",3)+" Problema para revivir";
   const campos=p.campos.map(c=>c.kind==="sel"
     ?`<div class="campo"><label>${c.label}</label><span class="vbs"><button type="button" class="vb" data-c="${c.id}" data-v="aceptados">Aceptados</button><button type="button" class="vb" data-c="${c.id}" data-v="rechazados">Rechazados</button></span></div>`
     :`<div class="campo"><label for="f_${c.id}">${c.label}</label><input id="f_${c.id}" type="number" step="any" inputmode="decimal"></div>`).join("");
@@ -871,6 +871,32 @@ const NIVELES=[
 ];
 const MODO_DESARROLLADOR=new URLSearchParams(location.search).get("dev")==="1";
 
+/* ============ Iconos pixel art (sustituyen a los emojis) ============ */
+// "." y "0" = transparente; cada dígito se busca en la paleta "c" del icono
+const ICONOS={
+  corazon:{p:["01100110","11211121","11111111","11111111","01111110","00111100","00011000"],c:{1:"#d90020",2:"#ff5555"}},
+  corazonVacio:{p:["01100110","11211121","11111111","11111111","01111110","00111100","00011000"],c:{1:"#2b2f55",2:"#3d4370"}},
+  sonido:{p:["..........","....1.....","...11..1..",".1111.1.1.",".1111.1.1.",".1111.1.1.","...11..1..","....1.....","..........",".........."],c:{1:"#fff"}},
+  silencio:{p:["..........","....1.....","...11.....",".1111.1.1.",".1111..1..",".1111.1.1.","...11.....","....1.....","..........",".........."],c:{1:"#fff"}},
+  pantalla:{p:["111....111","1........1","1........1","..........","..........","..........","..........","1........1","1........1","111....111"],c:{1:"#fff"}},
+  copa:{p:[".11111111.","1.311111.1","1.111111.1",".11111111.","..111111..","...1111...","....11....","....11....","...2222...","..222222.."],c:{1:"#ffd479",2:"#c98a2e",3:"#fff3b0"}},
+  calavera:{p:["..111111..",".11111111.","1111111111","1122112211","1122112211","1111221111","..111111..","..1.11.1..","..111111..",".........."],c:{1:"#f8edcf",2:"#171a32"}},
+  estrella:{p:["....11....","....11....","...1111...","1111111111",".11111111.","..111111..","..111111..",".111..111.",".11....11.",".........."],c:{1:"#ffd479"}},
+  libro:{p:["..........",".11111111.",".12222221.",".12333321.",".12222221.",".12333321.",".12222221.",".11111111.","..........",".........."],c:{1:"#b77d58",2:"#f8edcf",3:"#8a8fb0"}},
+  monstruo:{p:["3........3","33......33",".11111111.","1122112211","1122112211","1111111111",".11111111.",".15111151.","..111111..",".........."],c:{1:"#79b469",2:"#ffd479",3:"#c98a2e",5:"#fff"}}
+};
+const ICO_CACHE={};
+function icoUrl(n,e){
+  const k=n+"@"+e;if(ICO_CACHE[k])return ICO_CACHE[k];
+  const d=ICONOS[n],c=document.createElement("canvas");
+  c.width=d.p[0].length*e;c.height=d.p.length*e;
+  const x=c.getContext("2d");
+  d.p.forEach((fila,y)=>[...fila].forEach((ch,i)=>{const col=d.c[ch];if(col){x.fillStyle=col;x.fillRect(i*e,y*e,e,e)}}));
+  return ICO_CACHE[k]=c.toDataURL();
+}
+const ico=(n,e=2,alt="")=>`<img class="ico" src="${icoUrl(n,e)}" alt="${alt}">`;
+function icoEl(n,e=2,alt=""){const i=new Image();i.className="ico";i.src=icoUrl(n,e);i.alt=alt;return i}
+
 /* ============ Juego ============ */
 const W=480,H=270,GRAV=600,FLAP=-190,GAP=84,PW=32,FX=90,RAD=8;
 const NV=()=>NIVELES[G.nivel-1];
@@ -913,10 +939,12 @@ function emitirSonido(tipo){
     oscilador.start(inicio);oscilador.stop(inicio+duracion+.01);
   });
 }
+botonSonido.innerHTML=ico("sonido",2);
+document.getElementById("fullscreenToggle").innerHTML=ico("pantalla",2);
 if(AudioContexto){
   botonSonido.onclick=()=>{
     sonidoActivado=!sonidoActivado;
-    botonSonido.textContent=sonidoActivado?"🔊":"🔇";
+    botonSonido.innerHTML=ico(sonidoActivado?"sonido":"silencio",2);
     botonSonido.setAttribute("aria-label",sonidoActivado?"Silenciar sonido":"Activar sonido");
     botonSonido.setAttribute("aria-pressed",String(!sonidoActivado));
     if(sonidoActivado)emitirSonido("inicio");
@@ -940,6 +968,33 @@ if(document.fullscreenEnabled&&wrapEl.requestFullscreen){
   };
   document.addEventListener("fullscreenchange",actualizarBotonPantalla);
 }else botonPantalla.hidden=true;
+
+/* ===== Escala entera: cada píxel lógico del canvas = k×k píxeles de pantalla ===== */
+const hudEl=document.getElementById("hud");
+function ajustarEscala(){
+  const borde=cv.offsetWidth-cv.clientWidth;
+  const pantallaCompleta=document.fullscreenElement===wrapEl;
+  let k;
+  if(pantallaCompleta){
+    const kw=Math.floor((innerWidth*.96-borde)/W);
+    const kh=Math.floor((innerHeight-hudEl.offsetHeight-32-borde)/H);
+    k=Math.min(kw,kh);
+  }else{ // en ventana solo manda el ancho; si no cabe a alto completo, la página hace scroll
+    const cs=getComputedStyle(wrapEl);
+    const libre=wrapEl.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight);
+    k=Math.floor((libre-borde)/W);
+  }
+  if(k>=1){
+    cv.style.width=(W*k+borde)+"px";cv.style.height=(H*k+borde)+"px";
+    hudEl.style.width=pantallaCompleta?cv.style.width:"";
+  }else{ // pantallas muy angostas: no hay escala entera posible, ajuste fluido
+    cv.style.width="";cv.style.height="";hudEl.style.width="";
+  }
+  ajustarPortada();
+}
+addEventListener("resize",ajustarEscala);
+addEventListener("load",ajustarEscala);
+document.addEventListener("fullscreenchange",()=>setTimeout(ajustarEscala,60));
 
 /* ===== Pixel art: resolución lógica 480×270, se escala sin suavizado ===== */
 const ASSETS={fondo:"img/fondo.jpeg",rama:"img/rama.png",monstruo1:"img/monstruo1.png",monstruo2:"img/monstruo2.png",jefe:"img/jefe.png"};
@@ -980,7 +1035,9 @@ function hud(){
     document.getElementById("h2").textContent="Equipo 4 · FIME UANL";
     return;
   }
-  document.getElementById("h1").textContent=(NOMBRE?NOMBRE+" · ":"")+"Nivel "+G.nivel+" · "+"❤".repeat(Math.max(G.hearts,0))+"🖤".repeat(3-Math.max(G.hearts,0));
+  const h1=document.getElementById("h1"),vidas=Math.max(G.hearts,0);
+  h1.textContent=(NOMBRE?NOMBRE+" · ":"")+"Nivel "+G.nivel+" · ";
+  for(let i=0;i<3;i++)h1.appendChild(icoEl(i<vidas?"corazon":"corazonVacio",2,i<vidas?"Corazón":"Corazón vacío"));
   document.getElementById("h2").textContent=`Puntos ${G.puntos} · Récord ${leerRecord().puntos} · `+(G.seg<2?`Monstruo ${G.seg+1} de 3`:"Jefe final");
 }
 function panel(html,encuentro=false){
@@ -1030,7 +1087,7 @@ function inicio(){
     </h1>
     <div class="fila">
       <label class="nombre-campo"><span>Tu nombre</span><input id="nom" maxlength="12" placeholder="Escríbelo aquí" autocomplete="off"></label>
-      <p class="record">🏆 <span id="rp"></span></p>
+      <p class="record">${ico("copa",2)} <span id="rp"></span></p>
     </div>
     <div class="elige">Elige a tu hada</div>
     <div id="hs" role="group" aria-label="Elige a tu hada"></div>
@@ -1104,6 +1161,8 @@ function ajustarPortada(){
     display:"block",top:cv.offsetTop+cv.clientTop+"px",left:cv.offsetLeft+cv.clientLeft+"px",
     width:cv.clientWidth+"px",height:cv.clientHeight+"px",right:"auto",bottom:"auto"
   });
+  // la unidad de la portada sigue al canvas (no al contenedor), para que encaje con cualquier escala
+  panelEl.style.setProperty("--u",Math.min(20,Math.max(8,cv.offsetWidth*.0104))+"px");
 }
 addEventListener("resize",ajustarPortada);
 document.addEventListener("fullscreenchange",()=>setTimeout(ajustarPortada,60));
@@ -1161,9 +1220,9 @@ function cerrar(titulo,msg,gano){
 function fin(msg){emitirSonido("derrota");cerrar("Fin de la partida",msg,false)}
 function nivelCompleto(){
   emitirSonido("victoria");
-  if(G.nivel>=NIVELES.length)return cerrar("🎉 ¡Juego completado!",`Corazones restantes: ${G.hearts} (10 puntos cada uno).`,true);
+  if(G.nivel>=NIVELES.length)return cerrar(ico("estrella",3)+" ¡Juego completado!",`Corazones restantes: ${G.hearts} (10 puntos cada uno).`,true);
   G.estado="pausa";
-  panel(`<h3>🎉 ¡Nivel ${G.nivel} completado!</h3><p>Puntos: <b>${G.puntos}</b> · Corazones: ${G.hearts}</p>
+  panel(`<h3>${ico("estrella",3)} ¡Nivel ${G.nivel} completado!</h3><p>Puntos: <b>${G.puntos}</b> · Corazones: ${G.hearts}</p>
   <p>Siguiente: <b>Nivel ${G.nivel+1}</b>, ${NIVELES[G.nivel].tema}. La velocidad de los tubos se mantiene; los problemas son más grandes.</p><button id="sn">Siguiente nivel</button>`);
   document.getElementById("sn").onclick=()=>{G.nivel++;G.seg=0;G.preg=rng.shuffle(NV().preg);retomar()};
 }
@@ -1200,7 +1259,7 @@ function enfrentarMonstruo(){
 }
 function pregunta(){
   const q=G.preg[G.seg],ops=rng.shuffle(q.o.map((t,i)=>({t,ok:i===0})));
-  panel(`<h3>${icono("monstruo"+(G.seg+1),"👹")} Monstruo ${G.seg+1}</h3><p>${q.q}</p><div class="barra"><i id="b"></i></div><p id="t">20 s</p>`+
+  panel(`<h3>${icono("monstruo"+(G.seg+1),ico("monstruo",3))} Monstruo ${G.seg+1}</h3><p class="pregunta">${q.q}</p><div class="barra"><i id="b"></i></div><p id="t">20 s</p>`+
     ops.map((o,i)=>`<button class="op" data-i="${i}">${o.t}</button>`).join("")+`<p id="fb"></p>`,true);
   let listo=false;
   const resolver=ok=>{
@@ -1220,7 +1279,7 @@ function revivir(){
 function problema(tipo,ok,fail){
   const p=generarProblema(tipo);
   if(p.campos)return problemaCampos(p,tipo,ok,fail);
-  panel(`<h3>${tipo==="jefe"?icono("jefe","👹")+" Jefe final":"💀 Problema para revivir"}</h3><p>${p.enunciado}</p>
+  panel(`<h3>${tipo==="jefe"?icono("jefe",ico("monstruo",3))+" Jefe final":ico("calavera",3)+" Problema para revivir"}</h3><p>${p.enunciado}</p>
   <div class="barra"><i id="b"></i></div><p id="t">${p.tiempo} s</p>
   <input id="in" type="number" step="any" inputmode="decimal" placeholder="Tu respuesta"> <button id="rs">Responder</button><p id="fb"></p>`,tipo==="jefe");
   const inp=document.getElementById("in");let listo=false;
@@ -1247,7 +1306,7 @@ function probarProblema(tipo){
   const p=generarProblema(tipo);
   const mostrarSolucion=()=>solucion(p,()=>inicio());
   if(p.campos)return problemaCampos(p,tipo,mostrarSolucion,()=>mostrarSolucion());
-  panel(`<h3>${tipo==="jefe"?"👹 Jefe final":tipo==="monstruo"?"👹 Monstruo":"💀 Problema para revivir"}</h3><p>${p.enunciado}</p>
+  panel(`<h3>${tipo==="jefe"?ico("monstruo",3)+" Jefe final":tipo==="monstruo"?ico("monstruo",3)+" Monstruo":ico("calavera",3)+" Problema para revivir"}</h3><p>${p.enunciado}</p>
   <div class="barra"><i id="b"></i></div><p id="t">${p.tiempo} s</p>
   <input id="in" type="number" step="any" inputmode="decimal" placeholder="Tu respuesta"> <button id="rs">Responder</button><p id="fb"></p>`,tipo==="jefe");
   const inp=document.getElementById("in");
@@ -1310,21 +1369,73 @@ function loop(ts){
   }
   dibujar();requestAnimationFrame(loop);
 }
+/* ===== Ambiente nocturno y brillo del hada ===== */
+let NOCHE=null,HALO=null;
+const HADAS_PX=[],ESTELA=[];let ultEstela=0;
+function noche(){ // oscurecimiento + viñeta, prerrenderizados una sola vez
+  if(NOCHE)return NOCHE;
+  const c=document.createElement("canvas");c.width=W;c.height=H;
+  const x=c.getContext("2d");
+  x.fillStyle="rgba(14,17,40,.62)";x.fillRect(0,0,W,H);
+  const gr=x.createRadialGradient(W/2,H/2,H*.35,W/2,H/2,W*.62);
+  gr.addColorStop(0,"rgba(8,10,28,0)");gr.addColorStop(1,"rgba(8,10,28,.65)");
+  x.fillStyle=gr;x.fillRect(0,0,W,H);
+  return NOCHE=c;
+}
+function halo(){ // 24×24 que se amplía sin suavizado: el resplandor sale "pixelado"
+  if(HALO)return HALO;
+  const c=document.createElement("canvas");c.width=c.height=24;
+  const x=c.getContext("2d"),gr=x.createRadialGradient(12,12,1,12,12,12);
+  gr.addColorStop(0,"rgba(255,236,160,.85)");gr.addColorStop(.45,"rgba(255,190,120,.35)");gr.addColorStop(1,"rgba(255,160,150,0)");
+  x.fillStyle=gr;x.fillRect(0,0,24,24);
+  return HALO=c;
+}
+function hadaPx(i){ // el sprite es una cuadrícula de 29×29 px: se reduce exacto y se dibuja sin deformar píxeles
+  if(HADAS_PX[i])return HADAS_PX[i];
+  const c=document.createElement("canvas");c.width=c.height=29;
+  const x=c.getContext("2d");x.imageSmoothingEnabled=false;x.drawImage(HADAS[i],0,0,29,29);
+  return HADAS_PX[i]=c;
+}
+function dibujarHada(t){
+  const px=Math.round(FX),py=Math.round(G.y),parpadeo=G.inv>0&&Math.floor(G.inv*8)%2;
+  // estela de chispas
+  if(G.estado==="vuelo"&&t-ultEstela>.06){
+    ultEstela=t;
+    ESTELA.push({t,x:FX-8,y:G.y+Math.random()*10-5,c:Math.random()<.35?"#ff9bb0":"#ffe08a"});
+  }
+  for(let i=ESTELA.length-1;i>=0;i--){
+    const p=ESTELA[i],edad=t-p.t;
+    if(edad>.7){ESTELA.splice(i,1);continue}
+    g.globalAlpha=1-edad/.7;g.fillStyle=p.c;
+    const s=edad<.25?3:2;
+    g.fillRect(Math.round(p.x-edad*40),Math.round(p.y+edad*6),s,s);
+  }
+  // halo: parpadea por pasos para que se sienta pixel art
+  g.save();
+  g.globalCompositeOperation="lighter";
+  g.globalAlpha=(parpadeo?.35:1)*(Math.sin(t*6)>0?.9:.7);
+  g.drawImage(halo(),px-48,py-48,96,96);
+  g.restore();
+  g.globalAlpha=parpadeo?.35:1;
+  g.drawImage(hadaPx(SEL),px-14,py-14);
+  g.globalAlpha=1;
+}
 function dibujar(){
   g.imageSmoothingEnabled=false;
   if(G.estado==="inicio")return dibujarInicio();
   if(IMG.fondo){
     g.drawImage(IMG.fondo,0,0,W,H);
-    g.fillStyle="rgba(255,255,255,.2)";g.fillRect(0,0,W,H);
+    g.drawImage(noche(),0,0);
   }else{g.fillStyle=css("--sky");g.fillRect(0,0,W,H)}
   if(G.enfrentamiento&&(G.estado==="llegada"||G.estado==="pausa"))dibujarEnemigo(G.enfrentamiento,G.enemigoX);
   G.pipes.forEach(p=>{const x=Math.round(p.x),a=Math.round(p.gy-GAP/2),b=Math.round(p.gy+GAP/2);rama(x,0,PW,a,true);rama(x,b,PW,H-b,false)});
   G.corazones.forEach(dibujarCorazon);
-  g.globalAlpha=G.inv>0&&Math.floor(G.inv*8)%2?0.35:1;
-  const h=HADAS[SEL];g.drawImage(h,Math.round(FX-16),Math.round(G.y-16),32,32);g.globalAlpha=1;
-  g.textAlign="center";g.textBaseline="middle";g.fillStyle=css("--fg");
-  if(G.estado==="cuenta"){g.font='bold 32px "VT323", monospace';g.fillText(Math.ceil(G.cd),W/2,H/2-50)}
-  g.font='16px "VT323", monospace';g.textAlign="left";g.fillText(`Ramas del tramo: ${G.spawned}/10`,6,H-8);
+  dibujarHada(performance.now()/1000);
+  // texto claro con sombra dura: se lee sobre el fondo oscuro
+  const texto=(s,x,y)=>{g.fillStyle="#090d20";g.fillText(s,x+1,y+1);g.fillStyle="#f8edcf";g.fillText(s,x,y)};
+  g.textAlign="center";g.textBaseline="middle";
+  if(G.estado==="cuenta"){g.font='bold 32px "VT323", monospace';texto(String(Math.ceil(G.cd)),W/2,H/2-50)}
+  g.font='16px "VT323", monospace';g.textAlign="left";texto(`Ramas del tramo: ${G.spawned}/10`,6,H-8);
 }
 const CORAZON_PIXEL=["01100110","11211121","11111111","11111111","01111110","00111100","00011000"];
 function dibujarCorazon(c){
@@ -1334,7 +1445,7 @@ function dibujarCorazon(c){
   }));
 }
 
-cargarHadas.then(()=>{nuevo();inicio();requestAnimationFrame(loop)}).catch(error=>{
+cargarHadas.then(()=>{ajustarEscala();nuevo();inicio();requestAnimationFrame(loop)}).catch(error=>{
   console.error(error);
   panel("<p>No se pudieron cargar las hadas. Verifica que las imágenes de la carpeta img estén disponibles.</p>");
 });

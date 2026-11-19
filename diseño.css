@@ -249,10 +249,21 @@ input:focus-visible,
   outline-offset: 3px;
 }
 
+/* Pregunta de opción múltiple: más grande, para que mande sobre las respuestas */
+.pregunta {
+  margin: 10px 0 16px;
+  font-size: clamp(26px, 3.4vw, 36px);
+  line-height: 1.15;
+  color: #f8edcf;
+}
+
 .op {
   display: block;
   width: 100%;
   text-align: left;
+  text-transform: none; /* respeta mayúsculas y minúsculas: en estadística X y x no son lo mismo */
+  font-size: 22px;
+  letter-spacing: 0.02em;
   background: var(--bg);
   color: var(--fg);
   border: 2px solid var(--line);

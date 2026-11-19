@@ -500,7 +500,7 @@ st.textContent=`
 document.head.appendChild(st);
 
 const TABLAS=[["Distribución normal (Z)","tabla_z.png"],["Distribución χ²","tabla_chi.png"],["Kolmogorov-Smirnov (d α,N)","tabla_ks.png"]];
-const tablasHTML=()=>`<button id="vt" type="button">${ico("libro",2)} Ver tablas</button><div id="tb" class="tablas" hidden>`+
+const tablasHTML=()=>`<button id="vt" type="button">📖 Ver tablas</button><div id="tb" class="tablas" hidden>`+
   TABLAS.map(([t,f])=>`<details><summary>${t}</summary><a href="${RUTA_TABLAS}${f}" target="_blank" rel="noopener"><img src="${RUTA_TABLAS}${f}" alt="${t}" loading="lazy"></a></details>`).join("")+`</div>`;
 
 function leerCampo(c){
@@ -509,7 +509,7 @@ function leerCampo(c){
 }
 
 function problemaCampos(p,tipo,ok,fail){
-  const titulo=tipo==="jefe"?icono("jefe",ico("monstruo",3))+" Jefe final":tipo==="monstruo"?icono("monstruo"+(G.seg+1),ico("monstruo",3))+" Monstruo "+(G.seg+1):ico("calavera",3)+" Problema para revivir";
+  const titulo=tipo==="jefe"?icono("jefe","👹")+" Jefe final":tipo==="monstruo"?icono("monstruo"+(G.seg+1),"👹")+" Monstruo "+(G.seg+1):"💀 Problema para revivir";
   const campos=p.campos.map(c=>c.kind==="sel"
     ?`<div class="campo"><label>${c.label}</label><span class="vbs"><button type="button" class="vb" data-c="${c.id}" data-v="aceptados">Aceptados</button><button type="button" class="vb" data-c="${c.id}" data-v="rechazados">Rechazados</button></span></div>`
     :`<div class="campo"><label for="f_${c.id}">${c.label}</label><input id="f_${c.id}" type="number" step="any" inputmode="decimal"></div>`).join("");
@@ -743,6 +743,110 @@ function tPoisson(rng,N){
 return{tExponencial,tUniforme,tEmpirica,tPoisson};
 })();
 const {tExponencial,tUniforme,tEmpirica,tPoisson}=N5;
+const PREG6=[
+{q:"En el sistema de la caja de un supermercado, ¿cuál es una entidad?",o:["El cliente","El tiempo promedio en el sistema","El porcentaje de tiempo desocupado","La distribución uniforme de las llegadas"]},
+{q:"El tiempo promedio que un cliente permanece en el sistema es una variable…",o:["Endógena de salida","Exógena controlable","Exógena no controlable","Endógena de estado"]},
+{q:"La cantidad de clientes que hay en la cola en un instante dado es una variable…",o:["Endógena de estado","Endógena de salida","Exógena controlable","Exógena no controlable"]},
+{q:"La cantidad de cajas registradoras que se abren es una variable…",o:["Exógena controlable","Exógena no controlable","Endógena de estado","Endógena de salida"]},
+{q:"El tiempo entre las llegadas de los clientes a la caja es una variable…",o:["Exógena no controlable","Exógena controlable","Endógena de estado","Endógena de salida"]},
+{q:"En un sistema de colas de un solo canal, ¿cuántos clientes se atienden al mismo tiempo?",o:["Uno","Dos","Todos los que estén en la cola","Depende de la hora de llegada"]},
+{q:"En el juego de volados, la cantidad inicial, la meta y la apuesta inicial son variables…",o:["Exógenas controlables","Exógenas no controlables","Endógenas de estado","Endógenas de salida"]},
+{q:"En el juego de volados, ¿cómo se estima la probabilidad de llegar a la meta?",o:["Veces que se llegó a la meta entre los juegos terminados","Veces que se llegó a la quiebra entre las apuestas","Capital final entre capital inicial","Número de volados ganados entre la meta"]}
+];
+
+/* ============ Nivel 6: aplicaciones (colas de un canal y juego de volados) ============ */
+const N6=(function(){
+"use strict";
+const {num,entero,f4,suma,clamp}=N3.ayudas;
+const f2=x=>x.toFixed(2);
+const R5=rng=>Math.min(+rng.next().toFixed(5),0.99999);
+
+/* ---- Sistema de colas de un solo canal: caja de un supermercado ---- */
+function tCola(rng,N){
+  const jefe=N>=6;
+  const [a1,b1]=rng.pick([[1,10],[1,8]]),[a2,b2]=rng.pick([[1,6],[2,6]]);
+  const ia=Array.from({length:N},()=>rng.int(a1,b1)),sv=Array.from({length:N},()=>rng.int(a2,b2));
+  const r=new Resolutor();
+  let llegAnt=0,finAnt=0,sis=0,ocio=0,esperaron=0;
+  const sisLista=[],ocioLista=[];
+  for(let i=0;i<N;i++){
+    const lleg=llegAnt+ia[i],ini=Math.max(lleg,finAnt),fin=ini+sv[i],t=fin-lleg,o=ini-finAnt;
+    r.op("arit",`Cliente ${i+1}: hora de llegada = ${llegAnt} + ${ia[i]} = ${lleg}`);
+    r.op("comp",`Inicio de servicio = el mayor entre su llegada (${lleg}) y el fin del cliente anterior (${finAnt}${i?"":", el cajero empieza vacío"}) = ${ini}${ini>lleg?`; espera ${ini-lleg} min en la cola`:""}`);
+    r.op("arit",`Fin de servicio = ${ini} + ${sv[i]} = ${fin}`);
+    r.op("arit",`Tiempo en el sistema = ${fin} − ${lleg} = ${t}`);
+    r.op("arit",`Tiempo que el cajero estuvo inactivo = ${ini} − ${finAnt} = ${o}`);
+    if(ini>lleg)esperaron++;
+    sis+=t;ocio+=o;sisLista.push(t);ocioLista.push(o);llegAnt=lleg;finAnt=fin;
+  }
+  const prom=sis/N,pct=ocio/finAnt*100;
+  r.op("arit",`Suma de tiempos en el sistema = ${sisLista.join(" + ")} = ${sis}`,N-1);
+  r.op("arit",`Tiempo inactivo total del cajero = ${ocioLista.join(" + ")} = ${ocio}`,N-1);
+  r.op("arit",`Tiempo promedio en el sistema = ${sis} / ${N} = ${f4(prom)}`);
+  r.op("arit",`Porcentaje de tiempo desocupado = ${ocio} / ${finAnt} × 100 = ${f2(pct)}%`,2);
+  const campos=[
+    entero("fin","Hora en que termina de atenderse el último cliente (min)",finAnt),
+    entero("sis","Suma de los tiempos en el sistema (min)",sis),
+    entero("oc","Tiempo inactivo total del cajero (min)",ocio),
+    num("prom","Tiempo promedio en el sistema (min)",prom,{mostrar:f4(prom)}),
+    num("pct","Porcentaje de tiempo desocupado del cajero (%)",pct,{mostrar:f2(pct)})
+  ];
+  if(jefe)campos.push(entero("esp","Cantidad de clientes que tuvieron que esperar en la cola",esperaron));
+  return{
+    enunciado:`Sistema de colas de un solo canal (caja de un supermercado). Los tiempos entre llegadas (uniformes entre ${a1} y ${b1} min) y los tiempos de atención (uniformes entre ${a2} y ${b2} min) de ${N} clientes, ya generados, son:<br>Tiempos entre llegadas: ${ia.join(", ")}.<br>Tiempos de atención: ${sv.join(", ")}.<br>El reloj empieza en 0 y la primera llegada ocurre después de su tiempo entre llegadas; si el cajero está ocupado, el cliente espera en la cola. Calcula la hora en que termina el último cliente, la suma de los tiempos en el sistema (fin de servicio − llegada), el tiempo inactivo total del cajero, el tiempo promedio en el sistema${jefe?", cuántos clientes tuvieron que esperar":""} y el porcentaje de tiempo desocupado del cajero (tiempo inactivo ÷ hora en que termina el último cliente × 100, con 2 decimales).`,
+    respuesta:prom,respuestaTexto:`Último cliente termina en ${finAnt}; en el sistema ${sis} (promedio ${f4(prom)}); cajero inactivo ${ocio} (${f2(pct)}%)${jefe?`; esperaron ${esperaron}`:""}`,
+    pasos:r.pasos,ops:r.ops,sinTablas:true,
+    explicacion:`En un sistema de colas de un solo canal cada cliente llega después del anterior y empieza a ser atendido cuando llega o cuando el cajero termina con el cliente anterior, lo que ocurra al final. El tiempo en el sistema es fin de servicio − llegada, y el cajero está inactivo mientras espera al siguiente cliente. El porcentaje de tiempo desocupado es el tiempo inactivo entre el tiempo total simulado.`,
+    campos
+  };
+}
+const tColaCorta=(rng,n)=>tCola(rng,n<=7?3:4);   // revivir: n va de 6 a 8 (volados); la cola usa 3 o 4 clientes
+const tColaLarga=(rng,n)=>tCola(rng,n<=11?6:7);  // jefe: n va de 10 a 12 (volados); la cola usa 6 o 7 clientes
+
+/* ---- Juego de volados con apuesta doble ---- */
+function corrida(Rs,cap0,meta,ap,r){
+  let cap=cap0,sig=ap,metas=0,quiebras=0,juego=1,enJuego=0,mayor=cap0;
+  Rs.forEach((R,i)=>{
+    const b=Math.min(sig,cap),gana=R<=0.5,antes=cap;
+    enJuego++;
+    r.op("comp",`Volado ${i+1} (juego ${juego}): R = ${R.toFixed(5)} ${gana?"≤":">"} 0.5 → ${gana?"gana":"pierde"}`);
+    cap+=gana?b:-b;mayor=Math.max(mayor,cap);
+    r.op("arit",`Apuesta $${b}: capital ${antes} ${gana?"+":"−"} ${b} = $${cap}`);
+    sig=gana?ap:2*sig;
+    r.op("arit",gana?`La próxima apuesta vuelve a ser $${ap}`:`La próxima apuesta se duplica a $${sig}${sig>cap&&cap>0?` (solo hay $${cap}, así que se apuesta todo el capital)`:""}`);
+    if(cap>=meta){metas++;r.op("comp",`$${cap} ≥ $${meta}: llegó a la meta (juego ${juego} terminado). Empieza otro juego con $${cap0}`);cap=cap0;sig=ap;juego++;enJuego=0}
+    else if(cap<=0){quiebras++;r.op("comp",`Capital $${cap}: quiebra (juego ${juego} terminado). Empieza otro juego con $${cap0}`);cap=cap0;sig=ap;juego++;enJuego=0}
+    else r.op("comp",`$${cap} está entre 0 y $${meta}: el juego sigue`);
+  });
+  return{metas,quiebras,mayor,capFin:cap,enJuego};
+}
+function tVolados(rng,N){
+  N=clamp(N,6,14);
+  const jefe=N>=10,[cap0,meta,ap]=rng.pick([[40,90,20],[50,100,20],[30,70,10],[60,120,20]]);
+  let Rs,r,s;
+  do{Rs=Array.from({length:N},()=>R5(rng));r=new Resolutor();s=corrida(Rs,cap0,meta,ap,r)}
+  while(s.metas+s.quiebras<(jefe?2:1)); // debe terminar al menos un juego (dos en el jefe)
+  const term=s.metas+s.quiebras,prob=s.metas/term*100;
+  if(s.enJuego)r.pasos.push(`Al acabarse los números, el último juego quedó sin terminar (con $${s.capFin}), así que no cuenta.`);
+  r.op("arit",`Probabilidad de llegar a la meta = ${s.metas} / ${term} × 100 = ${f2(prob)}%`,2);
+  if(jefe)r.op("comp",`El mayor capital que se alcanzó en un volado fue $${s.mayor}`,N-1);
+  const campos=[
+    entero("metas","Veces que se llegó a la meta",s.metas),
+    entero("quiebras","Veces que se llegó a la quiebra",s.quiebras),
+    num("prob","Probabilidad de llegar a la meta (%)",prob,{mostrar:f2(prob)})
+  ];
+  if(jefe)campos.push(entero("mayor","Mayor capital que se alcanzó en un volado ($, antes de reiniciar el juego)",s.mayor));
+  return{
+    enunciado:`Juego de volados. Cada juego empieza con $${cap0} y termina al llegar a la meta de $${meta} (capital ≥ $${meta}) o a la quiebra (capital $0). La apuesta inicial es X = $${ap}; si se pierde, la siguiente apuesta es el doble (2X, 4X…) y, si se gana, se vuelve a apostar X. Si el capital no alcanza para la apuesta que toca, se apuesta todo el capital. Se gana el volado si R ≤ 0.5 y se pierde si R > 0.5. Al terminar un juego empieza otro con $${cap0}. Con los números aleatorios R = ${Rs.map(x=>x.toFixed(5)).join(", ")} (usados en orden), calcula cuántas veces se llegó a la meta, cuántas a la quiebra y la probabilidad de llegar a la meta (veces que se llegó a la meta ÷ juegos terminados × 100, con 2 decimales; el juego que quede sin terminar no cuenta)${jefe?", y el mayor capital que se alcanzó en un volado":""}.`,
+    respuesta:prob,respuestaTexto:`Meta ${s.metas} veces; quiebra ${s.quiebras} veces; probabilidad de llegar a la meta = ${f2(prob)}%${jefe?`; mayor capital $${s.mayor}`:""}`,
+    pasos:r.pasos,ops:r.ops,sinTablas:true,
+    explicacion:`En la simulación del juego de volados cada número aleatorio es un volado: si R ≤ 0.5 se gana y se suma la apuesta, y si no se pierde y se resta. Tras una pérdida la apuesta se duplica y tras una ganancia vuelve a X. Cada vez que se llega a la meta o a la quiebra se termina un juego y empieza otro. La probabilidad de llegar a la meta se estima con las veces que se llegó a la meta entre los juegos terminados.`,
+    campos
+  };
+}
+return{tCola,tColaCorta,tColaLarga,tVolados};
+})();
+const {tColaCorta,tColaLarga,tVolados}=N6;
 const VELOCIDAD_TUBOS=110,LAMBDA_TUBOS=0.6;
 const tSeriesCorta=(rng,n)=>tSeries(rng,n<=11?5:6); // en revivir n va de 10 a 12 (póker y distancias); series usa 5 o 6 números
 const NIVELES=[
@@ -760,35 +864,12 @@ const NIVELES=[
    rango:{revivir:{n:[10,12],t:[300,425]},jefe:{n:[9,12],t:[395,435]}}}, // revivir: n = N de póker y distancias (10 a 12); series usa 5 o 6. Jefe: series con 9 a 12 números
   {tema:"variables no uniformes y Poisson",vel:VELOCIDAD_TUBOS,lambda:LAMBDA_TUBOS,preg:PREG5,
    plant:{revivir:[tExponencial,tUniforme,tEmpirica],jefe:[tPoisson,tExponencial,tEmpirica]},
-   rango:{revivir:{n:[4,6],t:[165,280]},jefe:{n:[8,9],t:[270,525]}}} // revivir: uniforme, exponencial o empírica con 4 a 6 R. Jefe: Poisson, exponencial o empírica con 8 a 9 R
+   rango:{revivir:{n:[4,6],t:[165,280]},jefe:{n:[8,9],t:[270,525]}}}, // revivir: uniforme, exponencial o empírica con 4 a 6 R. Jefe: Poisson, exponencial o empírica con 8 a 9 R
+  {tema:"aplicaciones: sistema de colas de un canal y juego de volados",vel:VELOCIDAD_TUBOS,lambda:LAMBDA_TUBOS,preg:PREG6,
+   plant:{revivir:[tVolados,tColaCorta],jefe:[tVolados,tColaLarga]},
+   rango:{revivir:{n:[6,8],t:[245,315]},jefe:{n:[10,12],t:[425,495]}}} // revivir: volados con 6 a 8 R o cola con 3 o 4 clientes. Jefe: volados con 10 a 12 R o cola con 6 o 7 clientes
 ];
 const MODO_DESARROLLADOR=new URLSearchParams(location.search).get("dev")==="1";
-
-/* ============ Iconos pixel art (sustituyen a los emojis) ============ */
-// "." y "0" = transparente; cada dígito se busca en la paleta "c" del icono
-const ICONOS={
-  corazon:{p:["01100110","11211121","11111111","11111111","01111110","00111100","00011000"],c:{1:"#d90020",2:"#ff5555"}},
-  corazonVacio:{p:["01100110","11211121","11111111","11111111","01111110","00111100","00011000"],c:{1:"#2b2f55",2:"#3d4370"}},
-  sonido:{p:["..........","....1.....","...11..1..",".1111.1.1.",".1111.1.1.",".1111.1.1.","...11..1..","....1.....","..........",".........."],c:{1:"#fff"}},
-  silencio:{p:["..........","....1.....","...11.....",".1111.1.1.",".1111..1..",".1111.1.1.","...11.....","....1.....","..........",".........."],c:{1:"#fff"}},
-  pantalla:{p:["111....111","1........1","1........1","..........","..........","..........","..........","1........1","1........1","111....111"],c:{1:"#fff"}},
-  copa:{p:[".11111111.","1.311111.1","1.111111.1",".11111111.","..111111..","...1111...","....11....","....11....","...2222...","..222222.."],c:{1:"#ffd479",2:"#c98a2e",3:"#fff3b0"}},
-  calavera:{p:["..111111..",".11111111.","1111111111","1122112211","1122112211","1111221111","..111111..","..1.11.1..","..111111..",".........."],c:{1:"#f8edcf",2:"#171a32"}},
-  estrella:{p:["....11....","....11....","...1111...","1111111111",".11111111.","..111111..","..111111..",".111..111.",".11....11.",".........."],c:{1:"#ffd479"}},
-  libro:{p:["..........",".11111111.",".12222221.",".12333321.",".12222221.",".12333321.",".12222221.",".11111111.","..........",".........."],c:{1:"#b77d58",2:"#f8edcf",3:"#8a8fb0"}},
-  monstruo:{p:["3........3","33......33",".11111111.","1122112211","1122112211","1111111111",".11111111.",".15111151.","..111111..",".........."],c:{1:"#79b469",2:"#ffd479",3:"#c98a2e",5:"#fff"}}
-};
-const ICO_CACHE={};
-function icoUrl(n,e){
-  const k=n+"@"+e;if(ICO_CACHE[k])return ICO_CACHE[k];
-  const d=ICONOS[n],c=document.createElement("canvas");
-  c.width=d.p[0].length*e;c.height=d.p.length*e;
-  const x=c.getContext("2d");
-  d.p.forEach((fila,y)=>[...fila].forEach((ch,i)=>{const col=d.c[ch];if(col){x.fillStyle=col;x.fillRect(i*e,y*e,e,e)}}));
-  return ICO_CACHE[k]=c.toDataURL();
-}
-const ico=(n,e=2,alt="")=>`<img class="ico" src="${icoUrl(n,e)}" alt="${alt}">`;
-function icoEl(n,e=2,alt=""){const i=new Image();i.className="ico";i.src=icoUrl(n,e);i.alt=alt;return i}
 
 /* ============ Juego ============ */
 const W=480,H=270,GRAV=600,FLAP=-190,GAP=84,PW=32,FX=90,RAD=8;
@@ -832,12 +913,10 @@ function emitirSonido(tipo){
     oscilador.start(inicio);oscilador.stop(inicio+duracion+.01);
   });
 }
-botonSonido.innerHTML=ico("sonido",2);
-document.getElementById("fullscreenToggle").innerHTML=ico("pantalla",2);
 if(AudioContexto){
   botonSonido.onclick=()=>{
     sonidoActivado=!sonidoActivado;
-    botonSonido.innerHTML=ico(sonidoActivado?"sonido":"silencio",2);
+    botonSonido.textContent=sonidoActivado?"🔊":"🔇";
     botonSonido.setAttribute("aria-label",sonidoActivado?"Silenciar sonido":"Activar sonido");
     botonSonido.setAttribute("aria-pressed",String(!sonidoActivado));
     if(sonidoActivado)emitirSonido("inicio");
@@ -861,38 +940,6 @@ if(document.fullscreenEnabled&&wrapEl.requestFullscreen){
   };
   document.addEventListener("fullscreenchange",actualizarBotonPantalla);
 }else botonPantalla.hidden=true;
-
-/* ===== Escala entera: cada píxel lógico del canvas = k×k píxeles de pantalla ===== */
-const hudEl=document.getElementById("hud");
-function ajustarEscala(){
-  const borde=cv.offsetWidth-cv.clientWidth;
-  const pantallaCompleta=document.fullscreenElement===wrapEl;
-  let k;
-  if(pantallaCompleta){
-    const anchoDisponible=Math.max(1,innerWidth-borde);
-    const altoDisponible=Math.max(1,innerHeight-hudEl.offsetHeight-16-borde);
-    const anchoPorAlto=Math.round(altoDisponible*(W/H));
-    const ancho=Math.floor(Math.min(anchoDisponible,anchoPorAlto));
-    const alto=Math.floor(ancho*(H/W));
-    cv.style.width=ancho+"px";
-    cv.style.height=alto+"px";
-    hudEl.style.width=ancho+"px";
-  }else{ // en ventana solo manda el ancho; si no cabe a alto completo, la página hace scroll
-    const cs=getComputedStyle(wrapEl);
-    const libre=wrapEl.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight);
-    k=Math.floor((libre-borde)/W);
-    if(k>=1){
-      cv.style.width=(W*k+borde)+"px";cv.style.height=(H*k+borde)+"px";
-      hudEl.style.width="";
-    }else{ // pantallas muy angostas: no hay escala entera posible, ajuste fluido
-      cv.style.width="";cv.style.height="";hudEl.style.width="";
-    }
-  }
-  ajustarPortada();
-}
-addEventListener("resize",ajustarEscala);
-addEventListener("load",ajustarEscala);
-document.addEventListener("fullscreenchange",()=>setTimeout(ajustarEscala,60));
 
 /* ===== Pixel art: resolución lógica 480×270, se escala sin suavizado ===== */
 const ASSETS={fondo:"img/fondo.jpeg",rama:"img/rama.png",monstruo1:"img/monstruo1.png",monstruo2:"img/monstruo2.png",jefe:"img/jefe.png"};
@@ -933,9 +980,7 @@ function hud(){
     document.getElementById("h2").textContent="Equipo 4 · FIME UANL";
     return;
   }
-  const h1=document.getElementById("h1"),vidas=Math.max(G.hearts,0);
-  h1.textContent=(NOMBRE?NOMBRE+" · ":"")+"Nivel "+G.nivel+" · ";
-  for(let i=0;i<3;i++)h1.appendChild(icoEl(i<vidas?"corazon":"corazonVacio",2,i<vidas?"Corazón":"Corazón vacío"));
+  document.getElementById("h1").textContent=(NOMBRE?NOMBRE+" · ":"")+"Nivel "+G.nivel+" · "+"❤".repeat(Math.max(G.hearts,0))+"🖤".repeat(3-Math.max(G.hearts,0));
   document.getElementById("h2").textContent=`Puntos ${G.puntos} · Récord ${leerRecord().puntos} · `+(G.seg<2?`Monstruo ${G.seg+1} de 3`:"Jefe final");
 }
 function panel(html,encuentro=false){
@@ -985,7 +1030,7 @@ function inicio(){
     </h1>
     <div class="fila">
       <label class="nombre-campo"><span>Tu nombre</span><input id="nom" maxlength="12" placeholder="Escríbelo aquí" autocomplete="off"></label>
-      <p class="record">${ico("copa",2)} <span id="rp"></span></p>
+      <p class="record">🏆 <span id="rp"></span></p>
     </div>
     <div class="elige">Elige a tu hada</div>
     <div id="hs" role="group" aria-label="Elige a tu hada"></div>
@@ -1059,8 +1104,6 @@ function ajustarPortada(){
     display:"block",top:cv.offsetTop+cv.clientTop+"px",left:cv.offsetLeft+cv.clientLeft+"px",
     width:cv.clientWidth+"px",height:cv.clientHeight+"px",right:"auto",bottom:"auto"
   });
-  // la unidad de la portada sigue al canvas (no al contenedor), para que encaje con cualquier escala
-  panelEl.style.setProperty("--u",Math.min(20,Math.max(8,cv.offsetWidth*.0104))+"px");
 }
 addEventListener("resize",ajustarPortada);
 document.addEventListener("fullscreenchange",()=>setTimeout(ajustarPortada,60));
@@ -1118,9 +1161,9 @@ function cerrar(titulo,msg,gano){
 function fin(msg){emitirSonido("derrota");cerrar("Fin de la partida",msg,false)}
 function nivelCompleto(){
   emitirSonido("victoria");
-  if(G.nivel>=NIVELES.length)return cerrar(ico("estrella",3)+" ¡Juego completado!",`Corazones restantes: ${G.hearts} (10 puntos cada uno).`,true);
+  if(G.nivel>=NIVELES.length)return cerrar("🎉 ¡Juego completado!",`Corazones restantes: ${G.hearts} (10 puntos cada uno).`,true);
   G.estado="pausa";
-  panel(`<h3>${ico("estrella",3)} ¡Nivel ${G.nivel} completado!</h3><p>Puntos: <b>${G.puntos}</b> · Corazones: ${G.hearts}</p>
+  panel(`<h3>🎉 ¡Nivel ${G.nivel} completado!</h3><p>Puntos: <b>${G.puntos}</b> · Corazones: ${G.hearts}</p>
   <p>Siguiente: <b>Nivel ${G.nivel+1}</b>, ${NIVELES[G.nivel].tema}. La velocidad de los tubos se mantiene; los problemas son más grandes.</p><button id="sn">Siguiente nivel</button>`);
   document.getElementById("sn").onclick=()=>{G.nivel++;G.seg=0;G.preg=rng.shuffle(NV().preg);retomar()};
 }
@@ -1157,7 +1200,7 @@ function enfrentarMonstruo(){
 }
 function pregunta(){
   const q=G.preg[G.seg],ops=rng.shuffle(q.o.map((t,i)=>({t,ok:i===0})));
-  panel(`<h3>${icono("monstruo"+(G.seg+1),ico("monstruo",3))} Monstruo ${G.seg+1}</h3><p>${q.q}</p><div class="barra"><i id="b"></i></div><p id="t">20 s</p>`+
+  panel(`<h3>${icono("monstruo"+(G.seg+1),"👹")} Monstruo ${G.seg+1}</h3><p>${q.q}</p><div class="barra"><i id="b"></i></div><p id="t">20 s</p>`+
     ops.map((o,i)=>`<button class="op" data-i="${i}">${o.t}</button>`).join("")+`<p id="fb"></p>`,true);
   let listo=false;
   const resolver=ok=>{
@@ -1177,7 +1220,7 @@ function revivir(){
 function problema(tipo,ok,fail){
   const p=generarProblema(tipo);
   if(p.campos)return problemaCampos(p,tipo,ok,fail);
-  panel(`<h3>${tipo==="jefe"?icono("jefe",ico("monstruo",3))+" Jefe final":ico("calavera",3)+" Problema para revivir"}</h3><p>${p.enunciado}</p>
+  panel(`<h3>${tipo==="jefe"?icono("jefe","👹")+" Jefe final":"💀 Problema para revivir"}</h3><p>${p.enunciado}</p>
   <div class="barra"><i id="b"></i></div><p id="t">${p.tiempo} s</p>
   <input id="in" type="number" step="any" inputmode="decimal" placeholder="Tu respuesta"> <button id="rs">Responder</button><p id="fb"></p>`,tipo==="jefe");
   const inp=document.getElementById("in");let listo=false;
@@ -1204,7 +1247,7 @@ function probarProblema(tipo){
   const p=generarProblema(tipo);
   const mostrarSolucion=()=>solucion(p,()=>inicio());
   if(p.campos)return problemaCampos(p,tipo,mostrarSolucion,()=>mostrarSolucion());
-  panel(`<h3>${tipo==="jefe"?ico("monstruo",3)+" Jefe final":tipo==="monstruo"?ico("monstruo",3)+" Monstruo":ico("calavera",3)+" Problema para revivir"}</h3><p>${p.enunciado}</p>
+  panel(`<h3>${tipo==="jefe"?"👹 Jefe final":tipo==="monstruo"?"👹 Monstruo":"💀 Problema para revivir"}</h3><p>${p.enunciado}</p>
   <div class="barra"><i id="b"></i></div><p id="t">${p.tiempo} s</p>
   <input id="in" type="number" step="any" inputmode="decimal" placeholder="Tu respuesta"> <button id="rs">Responder</button><p id="fb"></p>`,tipo==="jefe");
   const inp=document.getElementById("in");
@@ -1267,73 +1310,21 @@ function loop(ts){
   }
   dibujar();requestAnimationFrame(loop);
 }
-/* ===== Ambiente nocturno y brillo del hada ===== */
-let NOCHE=null,HALO=null;
-const HADAS_PX=[],ESTELA=[];let ultEstela=0;
-function noche(){ // oscurecimiento + viñeta, prerrenderizados una sola vez
-  if(NOCHE)return NOCHE;
-  const c=document.createElement("canvas");c.width=W;c.height=H;
-  const x=c.getContext("2d");
-  x.fillStyle="rgba(14,17,40,.62)";x.fillRect(0,0,W,H);
-  const gr=x.createRadialGradient(W/2,H/2,H*.35,W/2,H/2,W*.62);
-  gr.addColorStop(0,"rgba(8,10,28,0)");gr.addColorStop(1,"rgba(8,10,28,.65)");
-  x.fillStyle=gr;x.fillRect(0,0,W,H);
-  return NOCHE=c;
-}
-function halo(){ // 24×24 que se amplía sin suavizado: el resplandor sale "pixelado"
-  if(HALO)return HALO;
-  const c=document.createElement("canvas");c.width=c.height=24;
-  const x=c.getContext("2d"),gr=x.createRadialGradient(12,12,1,12,12,12);
-  gr.addColorStop(0,"rgba(255,236,160,.85)");gr.addColorStop(.45,"rgba(255,190,120,.35)");gr.addColorStop(1,"rgba(255,160,150,0)");
-  x.fillStyle=gr;x.fillRect(0,0,24,24);
-  return HALO=c;
-}
-function hadaPx(i){ // el sprite es una cuadrícula de 29×29 px: se reduce exacto y se dibuja sin deformar píxeles
-  if(HADAS_PX[i])return HADAS_PX[i];
-  const c=document.createElement("canvas");c.width=c.height=29;
-  const x=c.getContext("2d");x.imageSmoothingEnabled=false;x.drawImage(HADAS[i],0,0,29,29);
-  return HADAS_PX[i]=c;
-}
-function dibujarHada(t){
-  const px=Math.round(FX),py=Math.round(G.y),parpadeo=G.inv>0&&Math.floor(G.inv*8)%2;
-  // estela de chispas
-  if(G.estado==="vuelo"&&t-ultEstela>.06){
-    ultEstela=t;
-    ESTELA.push({t,x:FX-8,y:G.y+Math.random()*10-5,c:Math.random()<.35?"#ff9bb0":"#ffe08a"});
-  }
-  for(let i=ESTELA.length-1;i>=0;i--){
-    const p=ESTELA[i],edad=t-p.t;
-    if(edad>.7){ESTELA.splice(i,1);continue}
-    g.globalAlpha=1-edad/.7;g.fillStyle=p.c;
-    const s=edad<.25?3:2;
-    g.fillRect(Math.round(p.x-edad*40),Math.round(p.y+edad*6),s,s);
-  }
-  // halo: parpadea por pasos para que se sienta pixel art
-  g.save();
-  g.globalCompositeOperation="lighter";
-  g.globalAlpha=(parpadeo?.35:1)*(Math.sin(t*6)>0?.9:.7);
-  g.drawImage(halo(),px-48,py-48,96,96);
-  g.restore();
-  g.globalAlpha=parpadeo?.35:1;
-  g.drawImage(hadaPx(SEL),px-14,py-14);
-  g.globalAlpha=1;
-}
 function dibujar(){
   g.imageSmoothingEnabled=false;
   if(G.estado==="inicio")return dibujarInicio();
   if(IMG.fondo){
     g.drawImage(IMG.fondo,0,0,W,H);
-    g.drawImage(noche(),0,0);
+    g.fillStyle="rgba(255,255,255,.2)";g.fillRect(0,0,W,H);
   }else{g.fillStyle=css("--sky");g.fillRect(0,0,W,H)}
   if(G.enfrentamiento&&(G.estado==="llegada"||G.estado==="pausa"))dibujarEnemigo(G.enfrentamiento,G.enemigoX);
   G.pipes.forEach(p=>{const x=Math.round(p.x),a=Math.round(p.gy-GAP/2),b=Math.round(p.gy+GAP/2);rama(x,0,PW,a,true);rama(x,b,PW,H-b,false)});
   G.corazones.forEach(dibujarCorazon);
-  dibujarHada(performance.now()/1000);
-  // texto claro con sombra dura: se lee sobre el fondo oscuro
-  const texto=(s,x,y)=>{g.fillStyle="#090d20";g.fillText(s,x+1,y+1);g.fillStyle="#f8edcf";g.fillText(s,x,y)};
-  g.textAlign="center";g.textBaseline="middle";
-  if(G.estado==="cuenta"){g.font='bold 32px "VT323", monospace';texto(String(Math.ceil(G.cd)),W/2,H/2-50)}
-  g.font='16px "VT323", monospace';g.textAlign="left";texto(`Ramas del tramo: ${G.spawned}/10`,6,H-8);
+  g.globalAlpha=G.inv>0&&Math.floor(G.inv*8)%2?0.35:1;
+  const h=HADAS[SEL];g.drawImage(h,Math.round(FX-16),Math.round(G.y-16),32,32);g.globalAlpha=1;
+  g.textAlign="center";g.textBaseline="middle";g.fillStyle=css("--fg");
+  if(G.estado==="cuenta"){g.font='bold 32px "VT323", monospace';g.fillText(Math.ceil(G.cd),W/2,H/2-50)}
+  g.font='16px "VT323", monospace';g.textAlign="left";g.fillText(`Ramas del tramo: ${G.spawned}/10`,6,H-8);
 }
 const CORAZON_PIXEL=["01100110","11211121","11111111","11111111","01111110","00111100","00011000"];
 function dibujarCorazon(c){
@@ -1343,7 +1334,7 @@ function dibujarCorazon(c){
   }));
 }
 
-cargarHadas.then(()=>{ajustarEscala();nuevo();inicio();requestAnimationFrame(loop)}).catch(error=>{
+cargarHadas.then(()=>{nuevo();inicio();requestAnimationFrame(loop)}).catch(error=>{
   console.error(error);
   panel("<p>No se pudieron cargar las hadas. Verifica que las imágenes de la carpeta img estén disponibles.</p>");
 });

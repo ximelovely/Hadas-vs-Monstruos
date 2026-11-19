@@ -16,5 +16,5 @@ Para generar el ejecutable portable de Windows (64 bits):
 npm run dist
 ```
 
-El archivo `Hadas-vs-Monstruos-Portable-1.0.1.exe` se genera en la carpeta `dist`. Se puede copiar y ejecutar en Windows sin instalar Node.js.
+El archivo `Hadas-vs-Monstruos-Portable-1.0.2.exe` se genera en la carpeta `dist`. Se puede copiar y ejecutar en Windows sin instalar Node.js.
 El empaquetado usa una carpeta temporal del sistema y luego copia el ejecutable a `dist`, para evitar bloqueos de sincronización en carpetas como OneDrive.

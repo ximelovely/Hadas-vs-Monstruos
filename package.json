@@ -17,7 +17,8 @@
       "back.js",
       "diseño.css",
       "img/**/*",
-      "main.cjs"
+      "main.cjs",
+      "preload.cjs"
     ],
     "directories": {
       "output": "dist"

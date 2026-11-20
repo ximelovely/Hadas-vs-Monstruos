@@ -950,13 +950,28 @@ if(AudioContexto){
     if(sonidoActivado)emitirSonido("inicio");
   };
 }else botonSonido.hidden=true;
-if(document.fullscreenEnabled&&wrapEl.requestFullscreen){
-  const actualizarBotonPantalla=()=>{
-    const activa=document.fullscreenElement===wrapEl;
-    botonPantalla.setAttribute("aria-label",activa?"Salir de pantalla completa":"Activar pantalla completa");
-    botonPantalla.setAttribute("aria-pressed",String(activa));
-    botonPantalla.title=activa?"Salir de pantalla completa":"Activar pantalla completa";
-  };
+let pantallaCompletaElectron=false;
+const estaEnPantallaCompleta=()=>pantallaCompletaElectron||document.fullscreenElement===wrapEl;
+const actualizarBotonPantalla=()=>{
+  const activa=estaEnPantallaCompleta();
+  wrapEl.toggleAttribute("data-fullscreen",activa);
+  document.documentElement.toggleAttribute("data-fullscreen",activa);
+  botonPantalla.setAttribute("aria-label",activa?"Salir de pantalla completa":"Activar pantalla completa");
+  botonPantalla.setAttribute("aria-pressed",String(activa));
+  botonPantalla.title=activa?"Salir de pantalla completa":"Activar pantalla completa";
+  setTimeout(()=>{ajustarEscala();ajustarPortada()},60);
+};
+if(window.electronAPI){
+  window.electronAPI.isFullscreen().then(activa=>{
+    pantallaCompletaElectron=activa;
+    actualizarBotonPantalla();
+  }).catch(error=>console.error("No se pudo consultar el modo de pantalla completa:",error));
+  window.electronAPI.onFullscreenChange(activa=>{
+    pantallaCompletaElectron=activa;
+    actualizarBotonPantalla();
+  });
+  botonPantalla.onclick=()=>window.electronAPI.toggleFullscreen();
+}else if(document.fullscreenEnabled&&wrapEl.requestFullscreen){
   botonPantalla.onclick=async()=>{
     try{
       if(document.fullscreenElement===wrapEl)await document.exitFullscreen();
@@ -973,7 +988,7 @@ if(document.fullscreenEnabled&&wrapEl.requestFullscreen){
 const hudEl=document.getElementById("hud");
 function ajustarEscala(){
   const borde=cv.offsetWidth-cv.clientWidth;
-  const pantallaCompleta=document.fullscreenElement===wrapEl;
+  const pantallaCompleta=estaEnPantallaCompleta();
   let k;
   if(pantallaCompleta){
     const kw=Math.floor((innerWidth*.96-borde)/W);
@@ -1031,7 +1046,7 @@ function nuevo(){
 }
 function hud(){
   if(G.estado==="inicio"){
-    document.getElementById("h1").textContent="Modelado y Simulación";
+    document.getElementById("h1").textContent="MODELADO Y SIMULACIÓN DE SISTEMAS DINÁMICOS";
     document.getElementById("h2").textContent="Equipo 4 · FIME UANL";
     return;
   }

@@ -114,7 +114,8 @@ canvas {
   touch-action: manipulation;
 }
 
-#wrap:fullscreen {
+#wrap:fullscreen,
+#wrap[data-fullscreen="true"] {
   width: 100vw;
   height: 100vh;
   max-width: none;
@@ -127,17 +128,20 @@ canvas {
   box-shadow: none;
 }
 
-#wrap:fullscreen #hud {
+#wrap:fullscreen #hud,
+#wrap[data-fullscreen="true"] #hud {
   width: min(90vw, 160vh);
   flex: 0 0 auto;
 }
 
-#wrap:fullscreen canvas {
+#wrap:fullscreen canvas,
+#wrap[data-fullscreen="true"] canvas {
   width: auto;
   height: min(90vh, 50.625vw);
 }
 
-#wrap:fullscreen #panel {
+#wrap:fullscreen #panel,
+#wrap[data-fullscreen="true"] #panel {
   top: 56px;
   bottom: 8px;
 }

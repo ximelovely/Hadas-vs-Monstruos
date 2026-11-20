@@ -301,33 +301,6 @@ function tKS(rng,N){
   };
 }
 
-function tMonMedia(rng,n){
-  n=clamp(n,4,6);
-  const Rs=genRs(rng,n),S=suma(Rs),xb=S/n,r=new Resolutor();
-  r.op("arit",`Suma: ${Rs.map(f4).join(" + ")} = ${f4(S)}`,n-1);
-  r.op("arit",`X̄ = ${f4(S)} / ${n} = ${f4(xb)}`);
-  return{
-    enunciado:`Calcula el promedio (media aritmética) de estos ${n} números rectangulares: ${lista(Rs)}.`,
-    respuesta:xb,respuestaTexto:`X̄ = ${f4(xb)}`,pasos:r.pasos,ops:r.ops,
-    explicacion:`El promedio es la suma de los números entre la cantidad de números.`,
-    campos:[num("xb","Promedio X̄",xb,{mostrar:f4(xb)})]
-  };
-}
-function tMonFO(rng,n){
-  n=clamp(n,4,6);
-  const Rs=genRs(rng,n),k=rng.int(0,3),r=new Resolutor();let cuenta=0;
-  Rs.forEach((R,i)=>{
-    const j=Math.min(Math.floor(R*4+1e-9),3),dentro=j===k;if(dentro)cuenta++;
-    r.op("clasif",`R${i+1} = ${f4(R)} cae en el intervalo ${j+1}: ${dentro?"se cuenta":"no se cuenta"}`);
-  });
-  return{
-    enunciado:`Se divide el intervalo de 0 a 1 en 4 partes iguales. ¿Cuántos de estos ${n} números caen en el intervalo ${k+1} (de ${f4(k/4)} a ${f4((k+1)/4)})? Números: ${lista(Rs)}.`,
-    respuesta:cuenta,respuestaTexto:`${cuenta}`,pasos:r.pasos,ops:r.ops,
-    explicacion:`La frecuencia observada (FO) de un intervalo es la cantidad de números que caen en él.`,
-    campos:[entero("fo","Cantidad de números en ese intervalo",cuenta)]
-  };
-}
-
 /* ---- Nivel 4: series, póker y distancias (números de 5 decimales) ---- */
 const f5=x=>x.toFixed(5);
 const R5=rng=>Math.min(+rng.next().toFixed(5),0.99999);
@@ -548,18 +521,11 @@ function problemaCampos(p,tipo,ok,fail){
   timer(p.tiempo,l=>{document.getElementById("b").style.width=(l/p.tiempo*100)+"%";document.getElementById("t").textContent=Math.ceil(l)+" s"},()=>terminar(false,"tiempo"));
 }
 
-function problemaMonstruo(){
-  const p=generarProblema("monstruo");
-  problemaCampos(p,"monstruo",
-    ()=>{G.puntos+=5;G.seg++;retomar()},
-    p=>{G.hearts--;hud();solucion(p,()=>G.hearts<=0?fin("Fallaste el problema del monstruo y no quedan corazones."):revivir())});
-}
-
 function irANivel(n=3,seg=0){G.nivel=n;G.seg=seg;G.preg=rng.shuffle(NV().preg);retomar()}
 
-return{tPromedios,tFrecuencias,tKS,tMonMedia,tMonFO,tSeries,tPoker,tDistancias,problemaCampos,problemaMonstruo,irANivel,calcProm,calcFrec,calcKS,revisar,ayudas:{num,entero,f4,suma,clamp}};
+return{tPromedios,tFrecuencias,tKS,tSeries,tPoker,tDistancias,problemaCampos,irANivel,calcProm,calcFrec,calcKS,revisar,ayudas:{num,entero,f4,suma,clamp}};
 })();
-const {tPromedios,tFrecuencias,tKS,tMonMedia,tMonFO,tSeries,tPoker,tDistancias,problemaCampos,problemaMonstruo,irANivel}=N3;
+const {tPromedios,tFrecuencias,tKS,tSeries,tPoker,tDistancias,problemaCampos,irANivel}=N3;
 
 const PREG3=[
 {q:"La prueba de promedios compara…",o:["El promedio de los números generados con el valor esperado 0.5","Las frecuencias observadas con las esperadas","La distribución acumulada con la uniforme","La cantidad de pares y tercias de dígitos"]},
@@ -569,7 +535,27 @@ const PREG3=[
 {q:"Con N números y n intervalos iguales, la frecuencia esperada FE es…",o:["N / n","n / N","N · n","N − n"]},
 {q:"La prueba de Kolmogorov-Smirnov compara…",o:["La distribución acumulada de los números con la de una uniforme","Solo el promedio de los números","La cantidad de números repetidos","El período del generador"]},
 {q:"En la prueba KS, el estadístico Dₙ es…",o:["La mayor diferencia absoluta entre F(xᵢ) y xᵢ","La suma de todas las diferencias","El menor valor de xᵢ","El promedio de los xᵢ"]},
-{q:"En la prueba KS, los números se rechazan si…",o:["Dₙ es mayor o igual que el valor d de la tabla","Dₙ es menor que el valor d de la tabla","N es menor que 10","α es menor que 5%"]}
+{q:"En la prueba KS, los números se rechazan si…",o:["Dₙ es mayor o igual que el valor d de la tabla","Dₙ es menor que el valor d de la tabla","N es menor que 10","α es menor que 5%"]},
+{q:"En la prueba de promedios, lo primero que se calcula es…",o:["La media aritmética de los N números rectangulares","La frecuencia observada de cada intervalo","La mayor diferencia Dₙ","Los grados de libertad"]},
+{q:"El estadístico de la prueba de promedios es…",o:["Z₀ = (X̄ − 1/2)·√N / √(1/12)","Z₀ = (X̄ − 1/12)·√N / √(1/2)","Z₀ = X̄·√N − 1/2","Z₀ = (X̄ − 1/2) / (N·√(1/12))"]},
+{q:"En la prueba de promedios, ¿cómo se obtiene el valor Z de la tabla?",o:["α real = 100% − α, y se busca Z de α real / 2","α real = α · N, y se busca Z de α real","α real = α / 2, y se busca Z de N","Se usa siempre Z = 0.5"]},
+{q:"En la prueba de frecuencias, el estadístico calculado se compara con…",o:["El valor χ² de la tabla con n − 1 grados de libertad","El valor Z de la tabla","El valor d de la tabla de Kolmogorov-Smirnov","El promedio 0.5"]},
+{q:"En la prueba de frecuencias, los números se aceptan cuando…",o:["χ₀² es menor que el valor χ² de la tabla","χ₀² es mayor que el valor χ² de la tabla","FO es distinta de FE en todos los intervalos","n es igual a N"]},
+{q:"El estadístico de la prueba de frecuencias χ₀² se calcula…",o:["Sumando (FOᵢ − FEᵢ)² de cada intervalo y dividiendo entre FE","Sumando FOᵢ · FEᵢ de cada intervalo","Sumando (FOᵢ − FEᵢ) sin elevar al cuadrado","Dividiendo N entre la suma de los números"]},
+{q:"En la prueba KS, antes de calcular F(xᵢ) se deben…",o:["Ordenar los números rectangulares de menor a mayor","Elevar los números al cuadrado","Calcular el promedio de los números","Dividirlos en n intervalos"]},
+{q:"En la prueba KS, F(xᵢ) = i / N, donde i es…",o:["La posición del número ya ordenado","El valor del número xᵢ","El nivel de significancia","La cantidad de intervalos"]},
+{q:"En la prueba KS, ¿cuál diferencia se compara con el valor d de la tabla?",o:["La mayor (en valor absoluto)","La menor","La primera","La suma de todas"]},
+{q:"En las pruebas de números rectangulares, α es…",o:["El nivel de significancia","La cantidad de números generados","El promedio de los números","Los grados de libertad"]},
+{q:"En la prueba de frecuencias, N representa…",o:["La cantidad de números rectangulares generados","La cantidad de intervalos","La frecuencia esperada","El nivel de significancia"]},
+{q:"En la prueba de frecuencias, n representa…",o:["La cantidad de intervalos en que se divide el rango de 0 a 1","La cantidad de números generados","La frecuencia observada","El valor de la tabla χ²"]},
+{q:"La frecuencia observada (FO) es…",o:["La cantidad de números que realmente caen en un intervalo","La cantidad de números que se espera en cada intervalo","El promedio de los números del intervalo","La diferencia máxima entre dos intervalos"]},
+{q:"Si en la prueba KS el valor Dₙ es menor que el valor d de la tabla, los números…",o:["Se aceptan","Se rechazan","Se vuelven a ordenar","Se dividen en intervalos"]},
+{q:"¿Qué tabla se consulta en cada prueba (promedios, frecuencias y KS)?",o:["Z, χ² y d de Kolmogorov-Smirnov, respectivamente","χ², Z y d de Kolmogorov-Smirnov, respectivamente","d de KS, Z y χ², respectivamente","Las tres usan la tabla Z"]},
+{q:"¿Cuál de estas pruebas exige ordenar los números de menor a mayor?",o:["Kolmogorov-Smirnov","Promedios","Frecuencias","Ninguna de las tres"]},
+{q:"¿Cuál de estas pruebas divide el intervalo de 0 a 1 en partes iguales?",o:["Frecuencias","Promedios","Kolmogorov-Smirnov","Ninguna de las tres"]},
+{q:"En la prueba de frecuencias, las diferencias (FOᵢ − FEᵢ) se elevan al cuadrado para…",o:["Que las diferencias positivas y negativas no se cancelen","Que el resultado sea menor que 1","Que FE sea un número entero","Que n sea mayor que N"]},
+{q:"Si en la prueba de promedios |Z₀| es menor que el valor Z de la tabla, se concluye que los números…",o:["Provienen de una distribución uniforme (se aceptan)","No son uniformes (se rechazan)","Tienen promedio exactamente 0.5","Necesitan más intervalos"]},
+{q:"En la prueba KS, F(xᵢ) = i / N se calcula con los números…",o:["Ya ordenados de forma ascendente","Sin ordenar, tal como se generaron","Elevados al cuadrado","Divididos entre su promedio"]}
 ];
 const PREG4=[
 {q:"En la prueba de póker, cada número rectangular se clasifica según…",o:["Los dígitos que se repiten en sus 5 decimales (la mano de póker)","Su promedio","La distancia al número anterior","El cuadrante donde cae"]},
@@ -857,8 +843,8 @@ const NIVELES=[
    plant:{revivir:[tMixtoX,tMixtoR,tMulti],jefe:[tPeriodo]},
    rango:{revivir:{n:[2,4],t:[60,105]},jefe:{n:[8,9],t:[180,240]}}}, // en el jefe, n es el valor de m
   {tema:"pruebas de promedios, frecuencias y KS",vel:VELOCIDAD_TUBOS,lambda:LAMBDA_TUBOS,preg:PREG3,
-   plant:{revivir:[tPromedios,tFrecuencias],jefe:[tKS,tFrecuencias],monstruo:[tMonMedia,tMonFO]},
-   rango:{revivir:{n:[4,6],t:[195,315]},jefe:{n:[7,10],t:[305,440]},monstruo:{n:[4,6],t:[40,150]}}}, // tiempo = operaciones × margen + 15 s por campo extra
+   plant:{revivir:[tPromedios,tFrecuencias],jefe:[tKS,tFrecuencias]},
+   rango:{revivir:{n:[4,6],t:[195,315]},jefe:{n:[7,10],t:[305,440]}}}, // tiempo = operaciones × margen + 15 s por campo extra
   {tema:"pruebas de series, póker y distancias",vel:VELOCIDAD_TUBOS,lambda:LAMBDA_TUBOS,preg:PREG4,
    plant:{revivir:[tPoker,tDistancias,tSeriesCorta],jefe:[tSeries]},
    rango:{revivir:{n:[10,12],t:[300,425]},jefe:{n:[9,12],t:[395,435]}}}, // revivir: n = N de póker y distancias (10 a 12); series usa 5 o 6. Jefe: series con 9 a 12 números
@@ -1128,7 +1114,6 @@ function inicio(){
       const nivel=Number(nivelPrueba.value);
       const plant=NIVELES[nivel-1].plant;
       const tipos=["revivir","jefe"];
-      if(plant.monstruo)tipos.push("monstruo");
       tipoProblema.innerHTML=tipos.map(tipo=>`<option value="${tipo}">${tipo==="revivir"?"Revivir":tipo==="jefe"?"Jefe final":"Monstruo"}</option>`).join("");
     };
     nivelPrueba.onchange=actualizarTipos;
@@ -1266,7 +1251,7 @@ function monstruo(){
 }
 function enfrentarMonstruo(){
   G.estado="pausa";
-  if(G.seg<2){NV().sinTeoria?problemaMonstruo():pregunta()}else problema("jefe",()=>{G.puntos+=15;G.enfrentamiento=null;nivelCompleto()},p=>{
+  if(G.seg<2){pregunta()}else problema("jefe",()=>{G.puntos+=15;G.enfrentamiento=null;nivelCompleto()},p=>{
     G.enfrentamiento=null;
     G.hearts--;hud();
     solucion(p,()=>G.hearts<=0?fin("Fallaste al jefe y no quedan corazones."):revivir());
